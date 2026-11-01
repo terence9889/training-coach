@@ -1,0 +1,20 @@
+{
+ "name": "訓練判讀台",
+ "short_name": "訓練判讀",
+ "start_url": "./",
+ "display": "standalone",
+ "background_color": "#EEF1F5",
+ "theme_color": "#1C4ED0",
+ "icons": [
+  {
+   "src": "icon-180.png",
+   "sizes": "180x180",
+   "type": "image/png"
+  },
+  {
+   "src": "icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png"
+  }
+ ]
+}

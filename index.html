@@ -1,0 +1,1213 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="訓練判讀">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#EEF1F5">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-180.png">
+<title>訓練判讀台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* 版面:手機單欄,數字用窄體方便一眼掃讀;狀態用左側色條 + 膠囊標示 */
+:root{
+  --bg:#EEF1F5; --surface:#FFFFFF; --ink:#131923; --muted:#5A6576; --line:#D7DDE6; --accent:#1C4ED0; --accent-soft:#E3EAFB;
+  --good:#0F7A55; --good-soft:#E1F3EA; --warn:#A35F00; --warn-soft:#FBEFD9; --bad:#BC2F28; --bad-soft:#FBE4E2;
+  --f-num:"Barlow Condensed","Roboto Condensed","Arial Narrow",sans-serif;
+  --f-body:"Noto Sans TC","PingFang TC","Heiti TC",system-ui,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0D1117; --surface:#161C25; --ink:#E6EBF2; --muted:#93A0B3; --line:#283243; --accent:#86A8FF; --accent-soft:#1D2A47;
+  --good:#45C892; --good-soft:#123326; --warn:#F2AE45; --warn-soft:#3A2A10; --bad:#F27A70; --bad-soft:#3D1A18; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0D1117; --surface:#161C25; --ink:#E6EBF2; --muted:#93A0B3; --line:#283243; --accent:#86A8FF; --accent-soft:#1D2A47;
+  --good:#45C892; --good-soft:#123326; --warn:#F2AE45; --warn-soft:#3A2A10; --bad:#F27A70; --bad-soft:#3D1A18; color-scheme:dark;}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.55 var(--f-body);-webkit-text-size-adjust:100%}
+main{max-width:640px;margin:0 auto;padding:16px 16px 48px;display:flex;flex-direction:column;gap:16px}
+h1,h2,h3{margin:0;text-wrap:balance}
+h1{font:700 26px/1.1 var(--f-num);letter-spacing:.02em}
+h2{font-size:16px;font-weight:700;display:flex;align-items:baseline;gap:8px}
+h3{font-size:14px;font-weight:700}
+.date{font:600 15px var(--f-num);color:var(--muted)}
+header{display:flex;flex-direction:column;gap:8px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.status{margin:0;font-size:13px;color:var(--muted);padding:8px 12px;border-radius:10px;background:var(--surface);border:1px solid var(--line)}
+.status[data-kind="ok"]{color:var(--good)} .status[data-kind="bad"]{color:var(--bad);background:var(--bad-soft);border-color:transparent}
+.status[data-kind="warn"]{color:var(--warn);background:var(--warn-soft);border-color:transparent}
+.status[data-kind="busy"]::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin-right:8px;animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.25}}
+@media (prefers-reduced-motion:reduce){.status[data-kind="busy"]::before{animation:none}}
+.fine{font-size:12px;color:var(--muted);margin:0}
+.btn{appearance:none;border:0;border-radius:10px;padding:9px 14px;font:600 14px var(--f-body);background:var(--accent);color:#fff;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+:root[data-theme="dark"] .btn:not(.ghost){color:#0D1117}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn:not(.ghost){color:#0D1117}}
+.btn.ghost{background:var(--accent-soft);color:var(--accent)}
+.btn:disabled{opacity:.6}
+.btn:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btnrow{display:flex;flex-wrap:wrap;gap:8px}
+
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.tile.wide{grid-column:1/-1}
+.lbl{font-size:12px;color:var(--muted)}
+.big{font:700 30px/1 var(--f-num);font-variant-numeric:tabular-nums}
+.big small{font-size:15px;color:var(--muted);margin-left:2px}
+.mid{font-size:16px;font-weight:700}
+.sub{font-size:12px;color:var(--muted)}
+.bar{position:relative;height:6px;border-radius:3px;background:var(--line);margin:6px 0 2px;overflow:visible}
+.bar>span:first-child{position:absolute;inset:0 auto 0 0;border-radius:3px;background:var(--accent)}
+.bar>span.over{background:var(--bad)}
+.bar .tick{position:absolute;top:-3px;width:2px;height:12px;background:var(--muted)}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1.2fr;gap:8px;align-items:end}
+label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+input[type=number],select,textarea{font:500 16px var(--f-body);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%;min-width:0}
+textarea{resize:vertical}
+.chk{flex-direction:row;align-items:center;gap:6px;font-size:13px;color:var(--ink);padding-bottom:10px}
+.chk.small{padding:0;font-size:12px;color:var(--muted);margin-left:auto}
+.chk input,.tag input{width:18px;height:18px;accent-color:var(--accent)}
+.note{margin:0;font-size:14px}
+
+.list{display:flex;flex-direction:column;gap:10px}
+.card{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--muted);border-radius:12px;overflow:hidden}
+.card.lv-pass{border-left-color:var(--good)} .card.lv-warn{border-left-color:var(--warn)} .card.lv-fail{border-left-color:var(--bad)}
+summary{list-style:none;cursor:pointer;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+summary::-webkit-details-marker{display:none}
+.sumrow{display:flex;align-items:center;gap:12px}
+.sumrow .d{font:700 20px/1 var(--f-num);display:flex;flex-direction:column;align-items:center;min-width:42px}
+.sumrow .d small{font:500 11px var(--f-body);color:var(--muted);margin-top:3px}
+.sumrow .t{flex:1;display:flex;flex-direction:column;min-width:0}
+.sumrow .t small{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.head{margin:0;font-size:14px;font-weight:500}
+.pill{font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.pill.good{background:var(--good-soft);color:var(--good)} .pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.bad{background:var(--bad-soft);color:var(--bad)} .pill.muted{background:var(--bg);color:var(--muted)} .pill.accent{background:var(--accent-soft);color:var(--accent)}
+.body{padding:0 14px 14px;display:flex;flex-direction:column;gap:12px}
+.callout{margin:0;padding:10px 12px;border-radius:10px;background:var(--accent-soft);font-size:14px}
+.callout.warn{background:var(--warn-soft)} .callout.good{background:var(--good-soft)}
+.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0}
+.metrics div{background:var(--bg);border-radius:8px;padding:8px}
+.metrics dt{font-size:11px;color:var(--muted)}
+.metrics dd{margin:0;font:700 20px/1.1 var(--f-num);font-variant-numeric:tabular-nums}
+.metrics sup{font:500 10px var(--f-body);color:var(--warn);margin-left:2px}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th{font-size:11px;color:var(--muted);font-weight:500;text-align:right;padding:4px 6px;border-bottom:1px solid var(--line)}
+td{font:600 16px var(--f-num);text-align:right;padding:5px 6px;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+td.good{color:var(--good)} td.warn{color:var(--warn)} td.bad{color:var(--bad)}
+.checks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.checks li{display:flex;gap:8px;font-size:14px}
+.mk{font-style:normal;font-weight:700;width:16px;flex:none;text-align:center}
+.mk.good,.good{color:var(--good)} .mk.bad,.bad{color:var(--bad)} .mk.muted{color:var(--muted)}
+.next{background:var(--accent-soft);border-radius:10px;padding:10px 12px}
+.next h3{color:var(--accent);margin-bottom:4px;font-size:15px}
+.next ul{margin:0;padding-left:18px;font-size:14px;display:flex;flex-direction:column;gap:4px}
+.ctx{border:1px dashed var(--line);border-radius:10px;padding:10px 12px;margin:0;display:flex;flex-direction:column;gap:10px}
+.ctx legend{font-size:12px;color:var(--muted);padding:0 4px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.grid.plan{grid-template-columns:repeat(4,1fr)}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tag{flex-direction:row;align-items:center;gap:6px;font-size:13px;color:var(--ink);background:var(--bg);border-radius:999px;padding:5px 10px}
+.full{grid-column:1/-1}
+.ai{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.aibox{white-space:pre-wrap;font-size:14px;background:var(--bg);border-radius:10px;padding:10px 12px;width:100%}
+.weeks{display:flex;flex-direction:column;gap:10px}
+.wk{display:flex;flex-direction:column;gap:6px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.wk:last-child{border-bottom:0;padding-bottom:0}
+.wkh{display:flex;align-items:center;gap:8px;font:600 15px var(--f-num)}
+.wkbar{position:relative;height:8px;background:var(--bg);border-radius:4px}
+.wkbar span{position:absolute;inset:0 auto 0 0;background:var(--accent);border-radius:4px}
+.wkbar span.over{background:var(--bad)} .wkbar span.under{background:var(--warn)}
+.wkbar i{position:absolute;top:-3px;width:2px;height:14px;background:var(--muted);opacity:.6}
+.wkm{display:flex;gap:16px;font-size:13px;color:var(--muted)}
+.wkm b{font:700 16px var(--f-num);color:var(--ink)}
+.wkm b.good{color:var(--good)} .wkm b.bad{color:var(--bad)}
+details.settings>summary{flex-direction:row;justify-content:space-between;font-weight:700;padding:0}
+details.settings[open]>summary{margin-bottom:10px}
+#settingsBody{display:flex;flex-direction:column;gap:12px}
+
+.warnt{color:var(--warn)}
+.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.pr{border-radius:10px;background:var(--bg);border-left:4px solid var(--line)}
+.pr.t-q{border-left-color:var(--accent)} .pr.t-e{border-left-color:var(--good)} .pr.t-r{border-left-color:var(--muted)}
+.pr summary{flex-direction:row;align-items:center;gap:10px;padding:8px 10px}
+.pd{font:700 17px/1 var(--f-num);display:flex;flex-direction:column;align-items:center;min-width:38px}
+.pd small{font:500 11px var(--f-body);color:var(--muted);margin-top:3px}
+.pt{flex:1;display:flex;flex-direction:column;min-width:0}
+.pt b{font-size:14px} .pt small{font-size:12px}
+.ptss{font:600 15px var(--f-num);color:var(--muted);font-variant-numeric:tabular-nums}
+.sent{font-size:11px;color:var(--good)} .sent.chg{color:var(--warn)}
+.pdet{padding:0 12px 10px 58px;font-size:13px;display:flex;flex-direction:column;gap:4px}
+.pdet p{margin:0}
+.pw{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin-top:4px}
+.est{margin-left:auto;font:600 14px var(--f-num);color:var(--ink)}
+.pnotes{margin:0;padding-left:18px;font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:2px}
+.prow .chk{padding:0}
+.steps{margin:0;padding-left:20px;font-size:14px;display:flex;flex-direction:column;gap:4px}
+.span2{grid-column:span 2}
+.copybox{width:100%;font:13px var(--f-body);background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px}
+#cloud.bad{color:var(--bad)}
+input[type=password],input[type=text],input[type=url],input[type=date]{font:500 16px var(--f-body);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%;min-width:0}
+@media (max-width:400px){.big{font-size:26px} .grid{grid-template-columns:repeat(2,1fr)} .grid.plan{grid-template-columns:repeat(3,1fr)} .span2{grid-column:1/-1} .row3{grid-template-columns:1fr 1fr} .row3 .chk{grid-column:1/-1;padding:0}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="top">
+      <div><h1>訓練判讀台</h1><p class="fine" id="lastSync"></p></div>
+      <button type="button" class="btn" id="syncBtn">同步</button>
+    </div>
+    <p class="status" id="status" role="status">載入中…</p>
+  </header>
+  <section class="panel" id="setup" aria-label="第一次使用"></section>
+  <section class="tiles" id="tiles" aria-label="摘要"></section>
+  <section class="panel" id="plan" aria-label="接下來的課表"></section>
+  <section class="panel" id="morning" aria-label="今早狀態"></section>
+  <section aria-label="活動判讀"><h2 style="margin:0 2px 8px">活動判讀</h2><div class="list" id="acts"></div></section>
+  <section class="panel" id="week" aria-label="週評估"></section>
+  <section class="panel"><details class="settings" id="settingsBox"><summary>設定<span class="fine">連線、門檻、課表、備份</span></summary><div id="settingsBody"></div></details></section>
+</main>
+<script>
+/* ===== 判讀引擎(純函式,不碰 DOM) ===== */
+const DEF_SETTINGS = {
+  ftp: 250,
+  rhrBase: 42,
+  sst: { lo: 225, hi: 228, tol: 3, restMax: 100, driftMax: 8, earlyHr: 168 },
+  ou: { underLo: 225, underHi: 228, overLo: 262, overHi: 265, tol: 3, hrAdv: 172, hrHard: 175, hrStop: 178, sets: 4, overReduced: 255 },
+  z2: { lo: 150, hi: 180, hrMax: 150 },
+  rec: { wMax: 140, hrMax: 130, maxMin: 60 },
+  out: { short: 220, mid: 200, long: 185, over215Max: 300, cadMin: 85, planH: 3.25 },
+  week: { lo: 400, hi: 600, recLo: 250, recHi: 300, growth: 8 },
+  heat: 32,
+  // 週一..週日
+  plan: ['SST', 'REC', 'OU', 'Z2', 'REST', 'OUT', 'REST'],
+  caps: [{ before: '2026-11-22', max: 255 }, { before: '2026-12-20', max: 265 }],
+  // 進階階梯起點:這週開的處方(索引對應 LADDER),恢復週錨點(之後每 3 建構 + 1 恢復)
+  prog: { start: '2026-10-26', sst: 2, ou: 1 },
+  anchor: '2026-10-19',
+  longH: { base: 3.25, step: 0.25, max: 4, rec: 2 },
+  z2Min: 90, recMin: 45
+};
+const LADDER = { SST: [[2, 15], [2, 20], [2, 30], [2, 35], [2, 40], [2, 45]], OU: [[3, 12], [4, 12], [4, 15], [4, 18], [5, 15]] };
+
+/* 區塊位置:錨點那週是恢復週,之後每 3 個建構週接 1 個恢復週;手動勾選會重設節奏 */
+function blockInfo(state, wk) {
+  const S = state.settings; const ex = w => state.weeks[w] && state.weeks[w].recovery;
+  if (wk < S.anchor) return { recovery: !!ex(wk), buildIdx: 0 };
+  let since = 0;
+  for (let w = S.anchor; w <= wk; w = addDays(w, 7)) {
+    const e = ex(w); const rec = e !== undefined ? !!e : (w === S.anchor ? true : since >= 3);
+    since = rec ? 0 : since + 1;
+    if (w === wk) return { recovery: rec, buildIdx: rec ? null : since - 1 };
+  }
+  return { recovery: false, buildIdx: 0 };
+}
+function isBusy(state, wk) { return !!(state.weeks[wk] && state.weeks[wk].busy); }
+
+const TYPE_LABEL = { SST: 'SST', OU: 'Over-Under', Z2: 'Z2 耐力', REC: '恢復騎', OUT: '戶外長騎', REST: '休息', OTHER: '其他' };
+const QUALITY = new Set(['SST', 'OU']);
+
+function classify(a) {
+  const n = (a.name || '').toLowerCase();
+  if (/over.?under/.test(n)) return 'OU';
+  if (/\bsst\b|sweet ?spot/.test(n)) return 'SST';
+  if (a.sport_type === 'Ride' && !a.is_trainer) return 'OUT';
+  if (/recovery|恢復/.test(n)) return 'REC';
+  if (/endurance|z2|耐力/.test(n)) return 'Z2';
+  if (a.sport_type === 'VirtualRide') return 'Z2';
+  return 'OTHER';
+}
+
+/* --- 數學小工具 --- */
+function roll(a, n) {
+  const out = new Array(a.length); let s = 0;
+  for (let i = 0; i < a.length; i++) { s += a[i] || 0; if (i >= n) s -= a[i - n] || 0; out[i] = s / Math.min(i + 1, n); }
+  return out;
+}
+function calcNP(w) {
+  if (!w || w.length < 120) return null;
+  const r = roll(w, 30); let s = 0, c = 0;
+  for (let i = 29; i < r.length; i++) { s += Math.pow(r[i], 4); c++; }
+  return Math.pow(s / c, 0.25);
+}
+function maxAvg(w, n) {
+  if (!w || w.length < n) return null;
+  let s = 0, m = 0;
+  for (let i = 0; i < w.length; i++) { s += w[i] || 0; if (i >= n) s -= w[i - n] || 0; if (i >= n - 1) m = Math.max(m, s / n); }
+  return m;
+}
+function mean(a) { const v = a.filter(x => x != null); return v.length ? v.reduce((p, c) => p + c, 0) / v.length : null; }
+function count(a, f) { let c = 0; for (const v of a) if (f(v)) c++; return c; }
+function r0(x) { return x == null ? null : Math.round(x); }
+function r1(x) { return x == null ? null : Math.round(x * 10) / 10; }
+
+/* 體感溫度(heat index,攝氏) */
+function feelsLike(t, h) {
+  if (t == null) return null;
+  if (h == null || t < 26.7) return t;
+  const T = t * 9 / 5 + 32, R = h;
+  let HI = -42.379 + 2.04901523 * T + 10.14333127 * R - 0.22475541 * T * R - 0.00683783 * T * T
+    - 0.05481717 * R * R + 0.00122874 * T * T * R + 0.00085282 * T * R * R - 0.00000199 * T * T * R * R;
+  return (HI - 32) * 5 / 9;
+}
+
+/* 以 30 秒平滑功率找出持續高於門檻的區段 */
+function findSegments(w, hr, th, minLen) {
+  const r = roll(w, 30); const raw = []; let start = -1, gap = 0;
+  for (let i = 0; i < r.length; i++) {
+    if (r[i] >= th) { if (start < 0) start = i; gap = 0; }
+    else if (start >= 0) {
+      gap++;
+      if (gap > 30) { const end = i - gap; if (end - start >= minLen) raw.push([start, end]); start = -1; gap = 0; }
+    }
+  }
+  if (start >= 0) { const end = r.length - 1 - gap; if (end - start >= minLen) raw.push([start, end]); }
+  return raw.map(([s, e]) => {
+    const s0 = Math.max(0, s - 15), e0 = Math.max(s0 + 1, e - 15);
+    const ws = w.slice(s0, e0), hs = hr ? hr.slice(s0, e0) : [];
+    return {
+      start: s0, end: e0, dur: e0 - s0,
+      avgW: mean(ws), avgHr: mean(hs), maxHr: hs.length ? Math.max(...hs) : null,
+      early10Hr: hs.length ? Math.max(...hs.slice(0, 600)) : null,
+      firstHalfHr: mean(hs.slice(0, Math.floor(hs.length / 2))), secondHalfHr: mean(hs.slice(Math.floor(hs.length / 2)))
+    };
+  });
+}
+
+/* --- 共用指標 --- */
+function baseMetrics(rec, S) {
+  const sm = rec.summary || {}; const st = rec.streams; const ftp = S.ftp;
+  const m = { dur: sm.moving_time || 0, avgW: sm.avg_watts ?? null, avgHr: sm.avg_hr ?? null, maxHr: sm.max_hr ?? null, cad: sm.avg_cadence ?? null };
+  if (st && st.watts && st.watts.length) {
+    const w = st.watts, h = st.heart_rate || [];
+    m.np = calcNP(w);
+    m.avgW = mean(w);
+    if (h.length) { m.avgHr = mean(h.filter(x => x > 0)); m.maxHr = Math.max(...h); }
+    const cads = (st.cadence || []).filter(x => x > 0); if (cads.length) m.cad = mean(cads);
+    // 有氧脫鉤:排除前 10 分鐘,前後半段 Pw:HR 比較
+    if (h.length > 1800) {
+      const s0 = Math.min(600, Math.floor(w.length * 0.1)); const mid = Math.floor((s0 + w.length) / 2);
+      const ef1 = mean(w.slice(s0, mid)) / mean(h.slice(s0, mid)), ef2 = mean(w.slice(mid)) / mean(h.slice(mid));
+      m.decouple = (ef1 - ef2) / ef1 * 100;
+    }
+    m.zones = {
+      z1: count(w, x => x <= 149), z2: count(w, x => x >= 150 && x <= 180), z3: count(w, x => x > 180 && x <= 216),
+      z4: count(w, x => x > 216 && x <= 252), z5: count(w, x => x > 252)
+    };
+    m.over215 = count(w, x => x > 215);
+    m.max2 = maxAvg(w, 120); m.max8 = maxAvg(w, 480); m.max20 = maxAvg(w, 1200);
+    m.hrZ5 = h.length ? count(h, x => x >= 175) : null;
+    m.estimated = false;
+  } else if (rec.est) {
+    Object.assign(m, rec.est); m.estimated = true;
+  }
+  if (m.np == null && m.avgW != null) { m.np = m.avgW * 1.05; m.estimated = true; }
+  if (m.np != null && m.dur) { m.if = m.np / ftp; m.tss = (m.dur * m.np * m.if) / (ftp * 3600) * 100; }
+  if (rec.est && rec.est.tss != null && !(st && st.watts)) m.tss = rec.est.tss;
+  return m;
+}
+
+/* --- 各課表判讀 --- */
+function lapKind(l, S) {
+  const w = l.avg_watts, t = l.elapsed_time;
+  if (w < 140) return t >= 200 ? 'rest' : 'easy';
+  if (w >= 200 && w < 247 && t >= 90 && t <= 150) return 'under';
+  if (w >= 247 && w <= 300 && t >= 40 && t <= 80) return 'over';
+  return 'other';
+}
+
+function analyzeOU(rec, S, m) {
+  const C = S.ou; const checks = []; let sets = [];
+  const laps = rec.laps || [];
+  if (laps.length) {
+    let cur = null;
+    for (const l of laps) {
+      const k = lapKind(l, S);
+      if (k === 'under' || k === 'over') { if (!cur) cur = { laps: [] }; cur.laps.push({ ...l, kind: k }); }
+      else if (k === 'easy') { /* 組內短暫輕踩,不切組 */ }
+      else { if (cur && cur.laps.length >= 2) sets.push(cur); cur = null; }
+    }
+    if (cur && cur.laps.length >= 2) sets.push(cur);
+    sets = sets.map((s, i) => {
+      const u = s.laps.filter(l => l.kind === 'under'), o = s.laps.filter(l => l.kind === 'over');
+      // 規則執行:HR > 172 之後的 Over 是否降到 255W;≥175 之後是否改 225W
+      let hit172 = false, hit175 = false, ignored172 = 0, ignored175 = 0;
+      for (const l of s.laps) {
+        if (l.kind === 'over') {
+          if (hit175 && l.avg_watts > C.underHi + 10) ignored175++;
+          else if (hit172 && l.avg_watts > C.overReduced + 4) ignored172++;
+        }
+        if (l.max_hr > C.hrAdv) hit172 = true;
+        if (l.max_hr >= C.hrHard) hit175 = true;
+      }
+      return {
+        n: i + 1, pairs: o.length, underW: mean(u.map(l => l.avg_watts)), overW: mean(o.map(l => l.avg_watts)),
+        maxHr: Math.max(...s.laps.map(l => l.max_hr || 0)), endHr: s.laps[s.laps.length - 1].avg_hr, ignored172, ignored175
+      };
+    });
+  } else if (rec.streams && rec.streams.watts) {
+    sets = findSegments(rec.streams.watts, rec.streams.heart_rate, 200, 400).map((g, i) => ({ n: i + 1, pairs: null, underW: null, overW: null, maxHr: g.maxHr, ignored172: 0, ignored175: 0, avgW: g.avgW }));
+    checks.push({ ok: null, text: '沒有分圈資料,只用功率曲線切組,Under/Over 瓦數無法分開判讀。' });
+  }
+  const res = { sets, checks };
+  if (!sets.length) { res.level = 'info'; res.headline = '找不到 Over-Under 組數,請確認課表類型。'; return res; }
+
+  const enough = sets.length >= C.sets;
+  checks.push({ ok: enough, text: `完成 ${sets.length} 組(計畫 ${C.sets} 組)` });
+  const uw = mean(sets.map(s => s.underW)), ow = mean(sets.map(s => s.overW));
+  if (uw != null) {
+    const okU = uw >= C.underLo - C.tol && uw <= C.underHi + C.tol;
+    checks.push({ ok: okU, text: `Under 平均 ${r0(uw)}W(目標 ${C.underLo}–${C.underHi}W)` + (uw > C.underHi + 1 ? `,建議 ERG 設 ${Math.round((C.underLo + C.underHi) / 2)}W` : '') });
+  }
+  if (ow != null) {
+    const okO = ow >= C.overLo - C.tol && ow <= C.overHi + C.tol;
+    checks.push({ ok: okO, text: `Over 平均 ${r0(ow)}W(目標 ${C.overLo}–${C.overHi}W)` });
+  }
+  const s3 = sets[2];
+  const adv = s3 ? s3.maxHr <= C.hrAdv : false;
+  if (s3) checks.push({ ok: adv, text: `第 3 組最高 HR ${s3.maxHr}(進階條件 ≤${C.hrAdv})` });
+  const stopHit = sets.some(s => s.maxHr >= C.hrStop);
+  checks.push({ ok: !stopHit, text: stopHit ? `有組數 HR 觸到 ${C.hrStop} 停止線` : `沒有組數觸到 ${C.hrStop} 停止線` });
+  const ign = sets.reduce((p, s) => p + s.ignored172 + s.ignored175, 0);
+  if (ign > 0) checks.push({ ok: false, text: `HR 超過門檻後仍有 ${ign} 趟 Over 維持原瓦數(規則:>${C.hrAdv} 降 ${C.overReduced}W,≥${C.hrHard} 改 ${C.underLo}W)` });
+
+  res.pass = enough && adv && !stopHit;
+  res.level = res.pass ? 'pass' : (enough ? 'warn' : 'fail');
+  res.headline = res.pass ? 'Over-Under 達標,本週這一項可計入進階。'
+    : enough ? '功率完成,但心率沒過進階門檻,下週維持同課表。' : '組數未完成,這堂不計入進階。';
+  return res;
+}
+
+function analyzeSST(rec, S, m) {
+  const C = S.sst; const checks = []; let sets = [];
+  const laps = (rec.laps || []).filter(l => l.elapsed_time >= 900 && l.avg_watts >= 200 && l.avg_watts <= 245);
+  if (laps.length >= 2) {
+    sets = laps.map((l, i) => ({ n: i + 1, dur: l.elapsed_time, avgW: l.avg_watts, avgHr: l.avg_hr, maxHr: l.max_hr, early10Hr: null }));
+  } else if (rec.streams && rec.streams.watts) {
+    sets = findSegments(rec.streams.watts, rec.streams.heart_rate, S.ftp * 0.8, 600).map((g, i) => ({ n: i + 1, ...g }));
+  } else if (rec.est && rec.est.sets) sets = rec.est.sets;
+  const res = { sets, checks };
+  if (sets.length < 1) { res.level = 'info'; res.headline = '找不到 SST 區段,請確認課表類型。'; return res; }
+  checks.push({ ok: sets.length >= 2, text: `完成 ${sets.length} 組,最長 ${Math.round(Math.max(...sets.map(s => s.dur || 0)) / 60)} 分鐘` });
+  const allPow = sets.every(s => s.avgW >= C.lo - C.tol && s.avgW <= C.hi + C.tol);
+  checks.push({ ok: allPow, text: `各組平均 ${sets.map(s => r0(s.avgW) + 'W').join(' / ')}(目標 ${C.lo}–${C.hi}W)` });
+  let drift = null;
+  if (sets.length >= 2 && sets[0].avgHr && sets[1].avgHr) {
+    drift = sets[1].avgHr - sets[0].avgHr;
+    checks.push({ ok: drift <= C.driftMax, text: `第 2 組比第 1 組 HR 高 ${r1(drift)} bpm(上限 ${C.driftMax})` });
+  }
+  if (sets[0].early10Hr != null) {
+    const bad = sets[0].early10Hr > C.earlyHr;
+    checks.push({ ok: !bad, text: bad ? `第 1 組前 10 分鐘 HR 到 ${sets[0].early10Hr},超過 ${C.earlyHr},規則是改 2×20 @88–90%` : `第 1 組前 10 分鐘 HR 最高 ${sets[0].early10Hr}(≤${C.earlyHr})` });
+  }
+  res.drift = drift;
+  res.pass = sets.length >= 2 && allPow && (drift == null || drift <= C.driftMax);
+  res.level = res.pass ? 'pass' : 'warn';
+  res.headline = res.pass ? 'SST 達標,本週這一項可計入進階。' : 'SST 有項目沒過,這堂不計入進階。';
+  return res;
+}
+
+function analyzeZ2(rec, S, m) {
+  const C = S.z2; const checks = []; const st = rec.streams;
+  if (st && st.watts) {
+    const w = st.watts, h = st.heart_rate || [];
+    const over = count(w, x => x > C.hi), pct = over / w.length * 100;
+    checks.push({ ok: pct <= 5, text: `超過 ${C.hi}W 的時間 ${Math.round(over / 60)} 分鐘(${r1(pct)}%)` });
+    const hrOver = count(h, x => x > C.hrMax);
+    checks.push({ ok: hrOver <= 30, text: `HR 最高 ${m.maxHr},超過 ${C.hrMax} 共 ${hrOver} 秒` });
+    const half = mean(w.slice(Math.floor(w.length / 2)));
+    if (half > C.hi - 8) checks.push({ ok: null, text: `後半段平均 ${r0(half)}W,貼近上限。品質課前一天可守在 160–170W。` });
+  } else {
+    checks.push({ ok: m.avgW <= C.hi, text: `平均 ${r0(m.avgW)}W(上限 ${C.hi}W)` });
+    if (m.maxHr) checks.push({ ok: m.maxHr <= C.hrMax, text: `HR 最高 ${m.maxHr}(上限 ${C.hrMax})` });
+  }
+  if (m.decouple != null) checks.push({ ok: m.decouple <= 5, text: `有氧脫鉤 ${r1(m.decouple)}%(≤5% 代表有氧穩定)` });
+  const pass = checks.filter(c => c.ok === false).length === 0;
+  return { checks, pass, level: pass ? 'pass' : 'warn', headline: pass ? 'Z2 守住區間,有氧課完成。' : 'Z2 有超出區間的地方。' };
+}
+
+function analyzeREC(rec, S, m) {
+  const C = S.rec; const checks = []; const st = rec.streams;
+  checks.push({ ok: m.avgW <= C.wMax, text: `平均 ${r0(m.avgW)}W(上限 ${C.wMax}W)` });
+  if (st && st.heart_rate) {
+    const o = count(st.heart_rate, x => x > C.hrMax);
+    checks.push({ ok: o <= 60, text: `HR 超過 ${C.hrMax} 共 ${Math.round(o / 60)} 分鐘` });
+  } else if (m.maxHr) checks.push({ ok: m.maxHr <= C.hrMax + 5, text: `HR 最高 ${m.maxHr}` });
+  checks.push({ ok: m.dur / 60 <= C.maxMin, text: `時間 ${Math.round(m.dur / 60)} 分鐘(上限 ${C.maxMin})` });
+  const pass = checks.every(c => c.ok !== false);
+  return { checks, pass, level: pass ? 'pass' : 'warn', headline: pass ? '恢復騎夠輕、夠短。' : '恢復騎太久或太用力,這是你常犯的地方。' };
+}
+
+function analyzeOUT(rec, S, m) {
+  const C = S.out; const checks = [];
+  const h = m.dur / 3600;
+  checks.push({ ok: h <= C.planH + 0.1, text: `移動時間 ${fmtDur(m.dur)}(計畫 ${C.planH} 小時)` });
+  if (m.over215 != null) checks.push({ ok: m.over215 <= C.over215Max, text: `超過 215W 合計 ${r1(m.over215 / 60)} 分鐘(上限 5 分鐘)` });
+  if (m.max2 != null) checks.push({ ok: m.max2 <= C.short, text: `最高 2 分鐘均功 ${r0(m.max2)}W(短坡上限 ${C.short}W)` });
+  if (m.max8 != null) checks.push({ ok: m.max8 <= C.mid, text: `最高 8 分鐘均功 ${r0(m.max8)}W(5–10 分鐘坡上限 ${C.mid}W)` });
+  if (m.max20 != null) checks.push({ ok: m.max20 <= C.long, text: `最高 20 分鐘均功 ${r0(m.max20)}W(長坡上限 ${C.long}W)` });
+  if (m.hrZ5) checks.push({ ok: m.hrZ5 <= 30, text: `HR ≥175 共 ${Math.round(m.hrZ5 / 60 * 10) / 10} 分鐘(Z2 長騎不該進 Z5)` });
+  if (m.cad) checks.push({ ok: m.cad >= C.cadMin, text: `平均迴轉數 ${r0(m.cad)}(目標 ≥${C.cadMin})` });
+  const bad = checks.filter(c => c.ok === false).length;
+  return { checks, pass: bad === 0, level: bad === 0 ? 'pass' : (bad >= 3 ? 'fail' : 'warn'),
+    headline: bad === 0 ? '戶外長騎守住強度上限。' : `有 ${bad} 項超出戶外限制,長騎變成在借下週品質課的體力。`,
+    note: '坡段以「最高 N 分鐘均功」近似,平路衝刺也會算進去。' };
+}
+
+/* --- 環境、補給 --- */
+function contextChecks(rec, S, m) {
+  const c = rec.ctx || {}; const out = [];
+  const fl = feelsLike(c.temp, c.hum);
+  const hot = fl != null && fl >= S.heat - 1.5 || (c.temp >= 27 && c.hum >= 75);
+  if (fl != null) out.push({ ok: !hot, text: `${(rec.typeOverride||rec.type)==='OUT'?'氣溫':'室溫'} ${c.temp}°C、濕度 ${c.hum ?? '–'}%,體感約 ${r0(fl)}°C` + (hot ? ',屬悶熱,HR 門檻只供參考,不拿去調 FTP' : '') });
+  const hours = m.dur / 3600;
+  if (c.fluid && hours > 0.5) {
+    const mlph = c.fluid / hours, need = hot ? 1000 : 500;
+    out.push({ ok: mlph >= need, text: `補水每小時 ${r0(mlph)}ml(${hot ? '悶熱建議 1000–1250' : '建議 500–750'}ml)` });
+  }
+  if (c.carbs != null && hours > 1.25) {
+    const gph = c.carbs / hours;
+    out.push({ ok: gph >= 40 && gph <= 75, text: `碳水每小時 ${r0(gph)}g(目標 40–60g)` });
+  }
+  return { list: out, hot, feels: fl };
+}
+
+function fmtDur(s) { const h = Math.floor(s / 3600), mi = Math.round((s % 3600) / 60); return h ? `${h}:${String(mi).padStart(2, '0')}` : `${mi} 分鐘`; }
+
+function analyze(rec, S) {
+  const type = rec.typeOverride || rec.type || 'OTHER';
+  const m = baseMetrics(rec, S);
+  let r;
+  if (type === 'OU') r = analyzeOU(rec, S, m);
+  else if (type === 'SST') r = analyzeSST(rec, S, m);
+  else if (type === 'Z2') r = analyzeZ2(rec, S, m);
+  else if (type === 'REC') r = analyzeREC(rec, S, m);
+  else if (type === 'OUT') r = analyzeOUT(rec, S, m);
+  else r = { checks: [], level: 'info', headline: '不在課表類型內,只計入週 TSS。' };
+  const ctx = contextChecks(rec, S, m);
+  // 悶熱時,心率沒過的品質課標為「環境限制」
+  if (ctx.hot && QUALITY.has(type) && r.level === 'warn') r.envLimited = true;
+  return { type, m, ...r, ctx };
+}
+
+/* --- 日期 --- */
+function dkey(d) { const x = new Date(d); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`; }
+function parseD(k) { const [y, mo, da] = k.split('-').map(Number); return new Date(y, mo - 1, da); }
+function addDays(k, n) { const d = parseD(k); d.setDate(d.getDate() + n); return dkey(d); }
+function weekday(k) { return (parseD(k).getDay() + 6) % 7; } // 週一=0
+function weekStart(k) { return addDays(k, -weekday(k)); }
+
+/* --- 週評估與 FTP 進度 --- */
+function weekSummary(state, wk) {
+  const S = state.settings; const acts = state.acts.filter(a => weekStart(a.date) === wk);
+  const tss = acts.reduce((p, a) => p + (a.res && a.res.m.tss || 0), 0);
+  const sst = acts.filter(a => a.res && a.res.type === 'SST'), ou = acts.filter(a => a.res && a.res.type === 'OU');
+  const recovery = blockInfo(state, wk).recovery;
+  const sstPass = sst.some(a => a.res.pass), ouPass = ou.some(a => a.res.pass);
+  return { wk, acts, tss, sstPass, ouPass, sstDone: sst.length > 0, ouDone: ou.length > 0, recovery, qualified: sstPass && ouPass,
+    range: recovery ? [S.week.recLo, S.week.recHi] : [S.week.lo, S.week.hi] };
+}
+
+function ftpProgress(state, todayK) {
+  const S = state.settings; const since = state.ftpHistory.length ? state.ftpHistory[state.ftpHistory.length - 1].date : '2000-01-01';
+  let wk = weekStart(todayK); let streak = 0; let guard = 0; const detail = [];
+  while (guard++ < 20) {
+    if (wk < weekStart(since) || (wk === weekStart(since) && state.ftpHistory.length)) break;
+    const w = weekSummary(state, wk);
+    if (!w.acts.length && wk !== weekStart(todayK)) break;
+    if (w.recovery) { detail.push({ wk, s: 'recovery' }); }
+    else if (w.qualified) { streak++; detail.push({ wk, s: 'ok' }); }
+    else if (wk === weekStart(todayK)) { detail.push({ wk, s: 'open' }); }
+    else { detail.push({ wk, s: 'miss' }); break; }
+    wk = addDays(wk, -7);
+  }
+  const cap = (S.caps.find(c => todayK < c.before) || { max: 9999 }).max;
+  const room = cap - S.ftp;
+  let advice;
+  if (streak >= 2) advice = room > 0 ? `連續 ${streak} 週兩項都達標,可以加 ${Math.min(3, room)}–${Math.min(5, room)}W。` : `已達本階段上限 ${cap}W,先不加。`;
+  else advice = `連續達標 ${streak} 週,還差 ${2 - streak} 週才能加瓦。`;
+  return { streak, cap, room, advice, detail };
+}
+
+/* --- 明天建議 --- */
+function tomorrowAdvice(state, rec) {
+  const S = state.settings; const out = [];
+  const tk = addDays(rec.date, 1); const plan = S.plan[weekday(tk)];
+  const res = rec.res; const c = rec.ctx || {};
+  const day = state.daily[rec.date] || {}; const dayPrev = state.daily[addDays(rec.date, -1)] || {};
+  const d = day.rhr != null ? day.rhr - S.rhrBase : null;
+  const dPrev = dayPrev.rhr != null ? dayPrev.rhr - S.rhrBase : null;
+  let rest = false, version = 'A';
+
+  if (res && QUALITY.has(res.type) && (res.m.maxHr >= S.ou.hrStop || (c.rpe >= 7))) rest = true;
+  if (res && res.type === 'OUT' && res.m.dur / 3600 > S.out.planH + 0.1) rest = true;
+  if (QUALITY.has(plan)) {
+    const lastQ = state.acts.filter(a => a.res && QUALITY.has(a.res.type) && a.date <= rec.date).sort((a, b) => b.start.localeCompare(a.start))[0];
+    if (lastQ) {
+      const hrs = (parseD(tk) - parseD(lastQ.date)) / 36e5;
+      if (hrs < 48) out.push(`距上次品質課(${lastQ.date.slice(5)})不到 48 小時,明天改 Z2,品質課順延一次。`);
+    }
+    if (d != null && d > 5) { version = 'B'; out.push(`今早靜止心率 ${day.rhr},比基準 ${S.rhrBase} 高 ${d},明天品質課改 B 版。`); }
+    if (day.sleep != null && day.sleep < 6) { out.push(`睡眠 ${day.sleep} 小時,不到 6 小時,明天不做品質課,改 Z2 或休息。`); version = '–'; }
+  }
+  if (d != null && d > 5 && dPrev != null && dPrev > 5) out.push('靜止心率連續兩天偏高超過 5,這週降量。');
+  const twoWeeks = state.acts.filter(a => a.date > addDays(rec.date, -14) && a.date <= rec.date && a.ctx && a.ctx.version === 'B').length;
+  if (twoWeeks >= 2) out.push(`兩週內已降階 ${twoWeeks} 次,建議提早進恢復週。`);
+  const stressed = state.acts.some(a => a.date > addDays(rec.date, -7) && a.ctx && a.ctx.tags && a.ctx.tags.includes('stress'))
+    || Object.entries(state.daily).some(([k, v]) => k > addDays(rec.date, -7) && k <= rec.date && v.stress);
+  if (stressed && QUALITY.has(plan)) out.push('這週有生活壓力(例如換工作),品質課照原強度做完就好,不進階,沒時間就用 C 版。');
+
+  let head;
+  if (rest) head = '明天完全休息';
+  else if (plan === 'REST') head = '明天休息(或 ≤60 分鐘輕鬆騎)';
+  else head = `明天 ${TYPE_LABEL[plan]}` + (QUALITY.has(plan) && version !== '–' ? `,${version} 版` : '');
+  if (rest && plan !== 'REST') out.unshift(`今天強度或時間偏高,明天的 ${TYPE_LABEL[plan]} 改成休息,不補課。`);
+  if (QUALITY.has(plan) && !rest) out.push('課前 2–3 小時吃低脂碳水;課中每小時 40–60g 碳水加電解質;室內悶熱時每小時喝 1–1.25L。');
+  if (plan === 'OUT' && !rest) out.push(`戶外長騎上限 ${S.out.planH} 小時;短坡 ≤${S.out.short}W,超過 215W 合計不超過 5 分鐘。`);
+  if (plan === 'REC' || plan === 'REST') out.push(`若要騎:≤${S.rec.wMax}W、HR ≤${S.rec.hrMax}、≤${S.rec.maxMin} 分鐘。你的恢復騎常騎太久,這次守住。`);
+  return { head, plan, items: out };
+}
+
+if (false) module.exports = { LADDER, blockInfo, isBusy, TYPE_LABEL, QUALITY, weekday, parseD, r0, r1, fmtDur, DEF_SETTINGS, classify, analyze, weekSummary, ftpProgress, tomorrowAdvice, dkey, addDays, weekStart, feelsLike };
+
+/* ===== 課表規劃(純函式):依週結果自動決定下週處方 ===== */
+function segTSS(segs) { return segs.reduce((p, [min, f]) => p + min / 60 * f * f * 100, 0); }
+
+function adjustLevel(p, ws) {
+  const n = { ...p };
+  const step = (key, laddKey, typ, failKey) => {
+    const acts = ws.acts.filter(a => a.res && a.res.type === typ);
+    if (!acts.length) return;
+    if (acts.some(a => a.res.pass)) { n[key] = Math.min(LADDER[laddKey].length - 1, p[key] + 1); n[failKey] = 0; return; }
+    if (acts.every(a => a.res.envLimited)) return; // 悶熱造成的未達標:維持,不算失敗
+    n[failKey] = (p[failKey] || 0) + 1;
+    if (n[failKey] >= 2) { n[key] = Math.max(0, p[key] - 1); n[failKey] = 0; }
+  };
+  step('sst', 'SST', 'SST', 'fs'); step('ou', 'OU', 'OU', 'fo');
+  return n;
+}
+
+/* 某週要開的強度階梯(忙碌週沿用上一個建構週,不進階) */
+function levelsFor(state, target) {
+  const P = state.settings.prog; let last = null, next = { sst: P.sst, ou: P.ou, fs: 0, fo: 0 };
+  const hist = [];
+  for (let w = P.start; w < target; w = addDays(w, 7)) {
+    if (blockInfo(state, w).recovery) continue;
+    const p = (last && isBusy(state, w)) ? { ...last } : { ...next };
+    next = adjustLevel(p, weekSummary(state, w)); last = p; hist.push({ w, p });
+  }
+  const busy = isBusy(state, target);
+  const lv = (last && busy) ? last : next;
+  return { lv, busy, wouldBe: next, prev: last };
+}
+
+function session(type, S, lv, info, opts = {}) {
+  const f = S.ftp; const rec = info.recovery;
+  const pct = w => Math.round(w / f * 100);
+  if (rec && type === 'OU') type = 'Z2R';
+  if (rec && type === 'Z2') type = 'REC';
+  switch (type) {
+    case 'SST': {
+      const [n, m] = rec ? [2, 15] : LADDER.SST[lv.sst]; const IF = (S.sst.lo + S.sst.hi) / 2 / f;
+      return { type: 'SST', title: `SST ${n}×${m}'`, detail: `${S.sst.lo}–${S.sst.hi}W,組間 5' ≤${S.sst.restMax}W;前 10 分鐘 HR >${S.sst.earlyHr} 改 2×20 @88–90%`,
+        b: `${n}×${Math.max(15, m - 10)}' 同瓦數`, c: `2×20' @${S.sst.lo}–${S.sst.hi}W(約 60 分鐘)`,
+        tss: segTSS([[15, .65], [n * m, IF], [(n - 1) * 5, .4], [10, .55]]), sport: 'VirtualRide',
+        iv: `Warmup\n- 15m ramp 50-75%\n\nMain set ${n}x\n- ${m}m ${pct(S.sst.lo)}-${pct(S.sst.hi)}%\n- 5m 40%\n\nCooldown\n- 10m ramp 65-45%` };
+    }
+    case 'OU': {
+      const [s, m] = LADDER.OU[lv.ou]; const reps = Math.round(m / 3); const u = (S.ou.underLo + S.ou.underHi) / 2 / f, o = (S.ou.overLo + S.ou.overHi) / 2 / f;
+      const setIF = Math.sqrt((2 * u * u + o * o) / 3);
+      const sets = Array.from({ length: s }, (_, i) => `Set ${i + 1} ${reps}x\n- 2m ${pct(S.ou.underLo)}-${pct(S.ou.underHi)}%\n- 1m ${pct(S.ou.overLo)}-${pct(S.ou.overHi)}%` + (i < s - 1 ? '\n\n- 5m 40%' : '')).join('\n\n');
+      return { type: 'OU', title: `Over-Under ${s}×${m}'`, detail: `每組 ${reps}×(2' ${S.ou.underLo}–${S.ou.underHi}W + 1' ${S.ou.overLo}–${S.ou.overHi}W),組間 5';第 3 組 HR ≤${S.ou.hrAdv} 才算進階`,
+        b: `${Math.max(3, s - 1)}×${m}'`, c: `3×12'`,
+        tss: segTSS([[15, .65], [s * m, setIF], [(s - 1) * 5, .4], [10, .55]]), sport: 'VirtualRide',
+        iv: `Warmup\n- 15m ramp 50-75%\n\n${sets}\n\nCooldown\n- 10m ramp 65-45%` };
+    }
+    case 'Z2': case 'Z2R': {
+      const min = type === 'Z2R' ? 60 : S.z2Min;
+      return { type: 'Z2', title: `Z2 ${min}'`, detail: `${S.z2.lo}–${S.z2.hi}W,HR ≤${S.z2.hrMax},迴轉 85 以上`, b: `${Math.round(min * 2 / 3)}'`, c: `60'`,
+        tss: segTSS([[min, .66]]), sport: 'VirtualRide', iv: `- ${min}m ${pct(S.z2.lo)}-${pct(S.z2.hi)}% 85-95rpm` };
+    }
+    case 'REC':
+      return { type: 'REC', title: `恢復騎 ${S.recMin}'`, detail: `≤${S.rec.wMax}W、HR ≤${S.rec.hrMax},時間到就停`, b: '休息', c: `30'`,
+        tss: segTSS([[S.recMin, .5]]), sport: 'VirtualRide', iv: `- ${S.recMin}m 40-${pct(S.rec.wMax)}% 85-95rpm` };
+    case 'OUT': {
+      const h = opts.longH; const hh = Math.floor(h), mm = Math.round((h - hh) * 60);
+      return { type: 'OUT', title: `戶外 Z2 ${hh}h${mm ? mm + "'" : ''}`, detail: `${S.z2.lo}–${S.z2.hi}W;短坡 ≤${S.out.short}W、5–10' 坡 ≤${S.out.mid}W、長坡 ≤${S.out.long}W,超過 215W 合計 ≤5'`,
+        b: `${Math.max(2, h - 1)}h`, c: '室內 Z2 90\'', tss: segTSS([[h * 60, .62]]), sport: 'Ride', iv: `- ${Math.round(h * 60)}m ${pct(S.z2.lo)}-${pct(S.z2.hi)}% 85-95rpm` };
+    }
+    default:
+      return { type: 'REST', title: '休息', detail: `想動就 ≤${S.recMin}' 恢復騎`, tss: 0 };
+  }
+}
+
+/* 一週處方 */
+function weekPlan(state, wk) {
+  const S = state.settings; const info = blockInfo(state, wk); const L = levelsFor(state, wk);
+  let longH = info.recovery ? S.longH.rec : Math.min(S.longH.max, S.longH.base + S.longH.step * (info.buildIdx || 0));
+  const days = [];
+  const build = () => { days.length = 0; for (let i = 0; i < 7; i++) { const d = addDays(wk, i); days.push({ date: d, ...session(S.plan[i], S, L.lv, info, { longH }) }); } };
+  build();
+  const notes = [];
+  // 量:相對上週實際 TSS 增幅 ≤8%
+  const prevW = addDays(wk, -7); const prevSum = weekSummary(state, prevW);
+  let est = days.reduce((p, d) => p + d.tss, 0);
+  if (!info.recovery && !prevSum.recovery && prevSum.tss > 200) {
+    let guard = 0;
+    while (est > prevSum.tss * (1 + S.week.growth / 100) && longH > 2.5 && guard++ < 8) { longH -= 0.25; build(); est = days.reduce((p, d) => p + d.tss, 0); }
+    if (guard) notes.push(`為了讓週量增幅 ≤${S.week.growth}%,長騎縮到 ${longH} 小時。`);
+  }
+  if (info.recovery) notes.push(`恢復週:週量約 ${S.week.recLo}–${S.week.recHi},強度只留短 SST。`);
+  else notes.push(`建構週第 ${info.buildIdx + 1} 週(3 建構 + 1 恢復)。`);
+  if (L.busy) {
+    notes.push('忙碌週:強度維持上一週,不進階;沒時間就直接用 C 版,不算失敗。');
+    if (L.wouldBe && L.prev && L.wouldBe.sst > L.prev.sst) notes.push(`SST 原本可以升到 ${LADDER.SST[L.wouldBe.sst].join('×')}',先維持。`);
+    if (L.wouldBe && L.prev && L.wouldBe.ou > L.prev.ou) notes.push(`Over-Under 原本可以升到 ${LADDER.OU[L.wouldBe.ou].join('×')}',先維持。`);
+  } else if (L.prev && !info.recovery) {
+    if (L.lv.sst > L.prev.sst) notes.push(`上週 SST 達標,升到 ${LADDER.SST[L.lv.sst].join('×')}'。`);
+    if (L.lv.ou > L.prev.ou) notes.push(`上週 Over-Under 達標,升到 ${LADDER.OU[L.lv.ou].join('×')}'。`);
+    if (L.lv.sst < L.prev.sst) notes.push('SST 連續兩週未達標,退一階。');
+    if (L.lv.ou < L.prev.ou) notes.push('Over-Under 連續兩週未達標,退一階。');
+    if (L.lv.ou === L.prev.ou && prevSum.ouDone && !prevSum.ouPass) notes.push('上週 Over-Under 沒過進階門檻,維持同課表。');
+  }
+  const bCount = state.acts.filter(a => a.date >= addDays(wk, -14) && a.date < wk && a.ctx && a.ctx.version === 'B').length;
+  if (bCount >= 2 && !info.recovery) notes.push(`兩週內降階 ${bCount} 次,建議把這週改成恢復週(在週評估勾選)。`);
+  return { wk, days, est, info, notes, longH, levels: L };
+}
+
+/* 接下來的日子:明天起到下週日;本週已做過的品質課不重複,明天套用當日規則 */
+function upcoming(state, todayK) {
+  const tomorrow = addDays(todayK, 1); const thisWk = weekStart(todayK); const nextWk = addDays(thisWk, 7);
+  const wkA = weekPlan(state, thisWk), wkB = weekPlan(state, nextWk);
+  const doneTypes = new Set(state.acts.filter(a => weekStart(a.date) === thisWk && a.res).map(a => a.res.type));
+  const rows = [];
+  for (const d of wkA.days.concat(wkB.days)) {
+    if (d.date < tomorrow) continue;
+    const r = { ...d, flags: [] };
+    if (weekStart(d.date) === thisWk && QUALITY.has(d.type) && doneTypes.has(d.type)) {
+      Object.assign(r, session('Z2', state.settings, {}, { recovery: false })); r.flags.push('本週已做過這堂品質課,改 Z2');
+    }
+    rows.push(r);
+  }
+  // 明天:依最新一堂課與晨間狀態調整
+  const latest = state.acts.filter(a => a.res && a.date <= todayK).sort((a, b) => b.start.localeCompare(a.start))[0];
+  if (latest && rows[0] && rows[0].date === tomorrow && latest.date === todayK) {
+    const adv = tomorrowAdvice(state, latest);
+    if (/完全休息/.test(adv.head) && rows[0].type !== 'REST') { rows[0] = { ...rows[0], ...session('REST', state.settings, {}, { recovery: false }), flags: ['昨天/今天負荷偏高,改休息,不補課'] }; }
+    else if (adv.items.some(x => /48 小時/.test(x)) && QUALITY.has(rows[0].type)) { const q = rows[0].title; rows[0] = { ...rows[0], ...session('Z2', state.settings, {}, { recovery: false }), flags: [`距上次品質課不到 48 小時,${q} 順延`] }; }
+    else if (/B 版/.test(adv.head) && QUALITY.has(rows[0].type)) rows[0].flags.push('今早靜止心率偏高,做 B 版:' + rows[0].b);
+  }
+  return { rows, thisWeek: wkA, nextWeek: wkB };
+}
+
+if (false) module.exports = { weekPlan, upcoming, levelsFor };
+
+/* ===== 獨立版:Intervals.icu 讀資料、GitHub Gist 跨裝置存檔 ===== */
+const $ = (s, el = document) => el.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const WD = ['週一', '週二', '週三', '週四', '週五', '週六', '週日'];
+const RIDE_TYPES = new Set(['Ride', 'VirtualRide', 'EBikeRide', 'GravelRide', 'MountainBikeRide']);
+const TAGS = [['hot', '悶熱'], ['stress', '換工作/壓力'], ['life', '生活因素'], ['sick', '身體不適']];
+const GIST_FILE = 'terence-coach.json';
+const now = () => Date.now();
+
+/* --- 本機快取(IndexedDB) --- */
+const DB = (() => {
+  let dbp; const mem = new Map();
+  try {
+    dbp = new Promise((res, rej) => { const r = indexedDB.open('terence-coach-v2', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }).catch(() => null);
+  } catch (e) { dbp = Promise.resolve(null); }
+  const get = async k => { const db = await dbp; if (!db) return mem.get(k); return new Promise(res => { try { const q = db.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => res(q.result); q.onerror = () => res(mem.get(k)); } catch (e) { res(mem.get(k)); } }); };
+  const set = async (k, v) => { mem.set(k, v); const db = await dbp; if (!db) return; return new Promise(res => { try { const t = db.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = res; t.onerror = res; } catch (e) { res(); } }); };
+  return { get, set };
+})();
+
+/* --- 狀態 --- */
+// doc:會同步到雲端的部分;cache:Intervals 抓來的活動(只存本機)
+const blankDoc = () => ({ app: 'terence-coach', v: 2, settings: structuredClone(DEF_SETTINGS), settingsT: 0, ctx: {}, daily: {}, weeks: { '2026-10-19': { recovery: true, _t: 1 }, '2026-11-02': { busy: true, _t: 1 } }, ftpHistory: [], pushed: {} });
+let doc = blankDoc(), cache = { acts: [], wellness: {}, lastSync: null }, conn = {};
+let state = null; // 給引擎用的檢視
+let open = null;
+
+function loadConn() { try { conn = JSON.parse(localStorage.getItem('tc-conn') || '{}'); } catch (e) { conn = {}; } }
+function saveConn() { try { localStorage.setItem('tc-conn', JSON.stringify(conn)); } catch (e) { } }
+
+function buildState() {
+  const daily = {};
+  for (const [k, w] of Object.entries(cache.wellness)) daily[k] = { ...w };
+  for (const [k, d] of Object.entries(doc.daily)) daily[k] = { ...(daily[k] || {}), ...Object.fromEntries(Object.entries(d).filter(([kk, v]) => v != null && kk !== '_t')) };
+  const weeks = Object.fromEntries(Object.entries(doc.weeks).map(([k, v]) => [k, v]));
+  const acts = cache.acts.map(a => {
+    const c = doc.ctx[a.id] || {};
+    const ctx = { ...c }; if (ctx.rpe == null && a.icu_rpe) ctx.rpe = a.icu_rpe;
+    return { ...a, ctx, typeOverride: c.__type || null };
+  });
+  state = { settings: doc.settings, acts, daily, weeks, ftpHistory: doc.ftpHistory };
+  for (const a of state.acts) a.res = analyze(a, state.settings);
+  state.acts.sort((a, b) => b.start.localeCompare(a.start));
+}
+
+async function loadLocal() {
+  const d = await DB.get('doc'); if (d) doc = mergeDocs(blankDoc(), d);
+  doc.settings = deepMerge(DEF_SETTINGS, doc.settings);
+  const c = await DB.get('cache'); if (c) cache = c;
+}
+let saveT = null, dirty = false;
+function touch() { dirty = true; DB.set('doc', doc); clearTimeout(saveT); saveT = setTimeout(cloudPush, 2500); }
+function deepMerge(base, over) {
+  const out = structuredClone(base);
+  for (const k in over || {}) {
+    if (over[k] && typeof over[k] === 'object' && !Array.isArray(over[k]) && base[k] && typeof base[k] === 'object' && !Array.isArray(base[k])) out[k] = deepMerge(base[k], over[k]);
+    else out[k] = over[k];
+  }
+  return out;
+}
+function mergeMap(a = {}, b = {}) { const out = { ...a }; for (const [k, v] of Object.entries(b)) if (!out[k] || (v && (v._t || 0) > (out[k]._t || 0))) out[k] = v; return out; }
+function mergeDocs(a, b) {
+  const out = { ...a };
+  if ((b.settingsT || 0) > (a.settingsT || 0)) { out.settings = b.settings; out.settingsT = b.settingsT; }
+  for (const k of ['ctx', 'daily', 'weeks', 'pushed']) out[k] = mergeMap(a[k], b[k]);
+  const seen = new Set(); out.ftpHistory = [...(a.ftpHistory || []), ...(b.ftpHistory || [])].filter(h => { const key = h.date + h.ftp; if (seen.has(key)) return false; seen.add(key); return true; }).sort((x, y) => x.date.localeCompare(y.date));
+  return out;
+}
+
+/* --- Intervals.icu --- */
+function aid() { return (conn.athlete || '0').trim(); }
+async function iv(path, opts = {}) {
+  const base = (conn.base || 'https://intervals.icu').replace(/\/$/, '');
+  let r;
+  try { r = await fetch(base + path, { ...opts, headers: { Authorization: 'Basic ' + btoa('API_KEY:' + (conn.ivKey || '').trim()), 'Content-Type': 'application/json', ...(opts.headers || {}) } }); }
+  catch (e) { throw { code: 'network' }; }
+  if (!r.ok) throw { code: 'http', status: r.status, text: (await r.text().catch(() => '')).slice(0, 160) };
+  if (r.status === 204) return null;
+  const t = await r.text(); return t ? JSON.parse(t) : null;
+}
+function ivErr(e) {
+  if (e.code === 'network') return '瀏覽器擋住了和 Intervals.icu 的連線。請照說明架 Cloudflare 中繼,把網址填到設定的「API 位址」。';
+  if (e.status === 401 || e.status === 403) return 'Intervals.icu 拒絕存取:API 金鑰或運動員 ID 不對,請到設定檢查。';
+  if (e.status === 404) return '找不到資料:運動員 ID 可能不對(格式像 i123456)。';
+  if (e.status === 429) return 'Intervals.icu 請求太頻繁,過一分鐘再同步。';
+  return `Intervals.icu 回應錯誤 ${e.status || ''},稍後再試。`;
+}
+let syncing = false;
+async function syncIntervals() {
+  if (syncing) return; if (!conn.ivKey) { setStatus('還沒設定 Intervals.icu API 金鑰,請先到下方「連線設定」。', 'warn'); return; }
+  syncing = true; setStatus('正在讀取 Intervals.icu 最近 28 天的活動…', 'busy');
+  try {
+    const today = dkey(new Date());
+    const list = await iv(`/api/v1/athlete/${aid()}/activities?oldest=${addDays(today, -28)}&newest=${today}`);
+    const rides = (list || []).filter(a => RIDE_TYPES.has(a.type) && (a.moving_time || 0) >= 600);
+    const known = new Map(cache.acts.map(a => [a.id, a]));
+    const todo = rides.filter(a => !known.get(String(a.id)) || !known.get(String(a.id)).detailed);
+    let n = 0;
+    for (const it of rides) {
+      const id = String(it.id); const rec = known.get(id) || { id };
+      Object.assign(rec, { name: it.name || '', sport_type: it.type, is_trainer: !!it.trainer, start: it.start_date_local, date: it.start_date_local.slice(0, 10), icu_rpe: it.icu_rpe || null,
+        summary: { moving_time: it.moving_time, avg_watts: it.icu_average_watts ?? it.average_watts ?? null, avg_hr: it.average_heartrate ?? null, max_hr: it.max_heartrate ?? null, avg_cadence: it.average_cadence ?? null },
+        temp: it.average_weather_temp ?? it.average_temp ?? null, hum: it.average_weather_humidity ?? null });
+      rec.type = classify(rec);
+      if (todo.includes(it)) {
+        n++; setStatus(`正在分析第 ${n}/${todo.length} 筆:${it.name || it.type}`, 'busy');
+        try {
+          const ints = await iv(`/api/v1/activity/${id}/intervals`);
+          rec.laps = ((ints && ints.icu_intervals) || []).map(l => ({ elapsed_time: l.elapsed_time, avg_watts: l.average_watts, avg_hr: l.average_heartrate, max_hr: l.max_heartrate }));
+        } catch (e) { rec.laps = []; }
+        try {
+          const ss = await iv(`/api/v1/activity/${id}/streams.json?types=watts,heartrate,cadence`);
+          const g = t => ((ss || []).find(s => s.type === t) || {}).data || null;
+          if (g('watts')) rec.streams = { watts: g('watts'), heart_rate: g('heartrate'), cadence: g('cadence') };
+        } catch (e) { }
+        rec.detailed = true;
+      }
+      if (!known.has(id)) cache.acts.push(rec);
+      // 戶外帶入天氣
+      if (rec.type === 'OUT' && rec.temp != null && !(doc.ctx[id] && doc.ctx[id].temp != null)) doc.ctx[id] = { ...(doc.ctx[id] || {}), temp: Math.round(rec.temp), hum: rec.hum ?? undefined, _t: 1 };
+    }
+    try {
+      const wl = await iv(`/api/v1/athlete/${aid()}/wellness?oldest=${addDays(today, -21)}&newest=${today}`);
+      for (const w of wl || []) cache.wellness[w.id] = { rhr: w.restingHR ?? null, sleep: w.sleepSecs ? Math.round(w.sleepSecs / 360) / 10 : null };
+    } catch (e) { }
+    const cutoff = addDays(today, -60);
+    cache.acts = cache.acts.filter(a => a.date >= cutoff);
+    cache.lastSync = new Date().toISOString(); await DB.set('cache', cache);
+    buildState(); if (todo.length) open = state.acts[0] && state.acts[0].id;
+    render();
+    setStatus(todo.length ? `已讀入 ${todo.length} 筆新活動並完成判讀。` : '已是最新,沒有新活動。', 'ok');
+  } catch (e) { setStatus(ivErr(e), 'bad'); }
+  finally { syncing = false; }
+}
+
+/* 送課表到 Intervals 行事曆(Zwift 會在首頁看到當天課表) */
+function sig(r) { return r.title + '|' + (r.iv || ''); }
+async function pushPlan(btn) {
+  if (!conn.ivKey) { setStatus('先設定 Intervals.icu API 金鑰才能送課表。', 'warn'); return; }
+  const rows = upcoming(state, dkey(new Date())).rows;
+  btn.disabled = true; btn.textContent = '傳送中…';
+  try {
+    for (const r of rows) { const p = doc.pushed[r.date]; if (p && p.id) { try { await iv(`/api/v1/athlete/${aid()}/events/${p.id}`, { method: 'DELETE' }); } catch (e) { if (e.code === 'network') throw e; } delete doc.pushed[r.date]; } }
+    const evs = rows.filter(r => r.iv).map(r => ({ category: 'WORKOUT', start_date_local: r.date + 'T00:00:00', type: r.sport, name: r.title, description: r.iv + `\n\n${r.detail}\nB 版:${r.b}\nC 版:${r.c}`, external_id: 'tcoach-' + r.date }));
+    let created;
+    try { created = await iv(`/api/v1/athlete/${aid()}/events/bulk`, { method: 'POST', body: JSON.stringify(evs) }); }
+    catch (e) { if (e.status === 404 || e.status === 405) { created = []; for (const ev of evs) created.push(await iv(`/api/v1/athlete/${aid()}/events`, { method: 'POST', body: JSON.stringify(ev) })); } else throw e; }
+    for (const ev of created || []) { const d = (ev.start_date_local || '').slice(0, 10); const r = rows.find(x => x.date === d); if (r) doc.pushed[d] = { id: ev.id, sig: sig(r), _t: now() }; }
+    for (const r of rows) if (!r.iv && !doc.pushed[r.date]) doc.pushed[r.date] = { id: null, sig: sig(r), _t: now() };
+    touch(); renderPlan(); setStatus(`已把 ${evs.length} 堂課送到 Intervals.icu 行事曆。`, 'ok');
+  } catch (e) { setStatus(e.code ? ivErr(e) : '送出失敗,稍後再試。', 'bad'); }
+  finally { btn.disabled = false; btn.textContent = '送到 Intervals / Zwift'; }
+}
+
+/* --- GitHub Gist 雲端存檔 --- */
+async function gh(path, opts = {}) {
+  let r;
+  try { r = await fetch('https://api.github.com' + path, { ...opts, headers: { Authorization: 'Bearer ' + (conn.ghToken || '').trim(), Accept: 'application/vnd.github+json', ...(opts.body ? { 'Content-Type': 'application/json' } : {}) } }); }
+  catch (e) { throw { code: 'network' }; }
+  if (!r.ok) throw { code: 'http', status: r.status };
+  return r.json();
+}
+function ghErr(e) {
+  if (e.status === 401) return 'GitHub 權杖無效或過期,請到設定換一組(需要 gist 權限)。';
+  if (e.status === 403 || e.status === 404) return 'GitHub 權杖沒有 gist 權限,或找不到存檔。';
+  if (e.code === 'network') return '連不到 GitHub,先用本機資料,恢復網路後會再同步。';
+  return '雲端存檔失敗,稍後會再試。';
+}
+async function findGist() {
+  for (let page = 1; page <= 3; page++) {
+    const list = await gh(`/gists?per_page=100&page=${page}`);
+    const g = list.find(x => x.files && x.files[GIST_FILE]); if (g) return g.id;
+    if (list.length < 100) break;
+  }
+  return null;
+}
+async function cloudPull() {
+  if (!conn.ghToken) return;
+  setCloud('讀取雲端存檔…');
+  try {
+    if (!conn.gistId) { conn.gistId = await findGist(); saveConn(); }
+    if (conn.gistId) {
+      const g = await gh('/gists/' + conn.gistId); const f = g.files[GIST_FILE];
+      let txt = f.content; if (f.truncated) txt = await (await fetch(f.raw_url)).text();
+      const remote = JSON.parse(txt);
+      doc = mergeDocs(doc, remote); doc.settings = deepMerge(DEF_SETTINGS, doc.settings); DB.set('doc', doc);
+      buildState(); render();
+    }
+    setCloud('雲端存檔已同步 ' + new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }));
+    if (dirty || !conn.gistId) cloudPush();
+  } catch (e) { setCloud(ghErr(e), true); }
+}
+async function cloudPush() {
+  if (!conn.ghToken) return;
+  const body = JSON.stringify(doc);
+  try {
+    if (!conn.gistId) {
+      const g = await gh('/gists', { method: 'POST', body: JSON.stringify({ description: '訓練判讀台存檔(請勿公開)', public: false, files: { [GIST_FILE]: { content: body } } }) });
+      conn.gistId = g.id; saveConn();
+    } else await gh('/gists/' + conn.gistId, { method: 'PATCH', body: JSON.stringify({ files: { [GIST_FILE]: { content: body } } }) });
+    dirty = false; setCloud('已存到雲端 ' + new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }));
+  } catch (e) { setCloud(ghErr(e), true); }
+}
+function setCloud(t, bad) { const el = $('#cloud'); if (el) { el.textContent = t; el.classList.toggle('bad', !!bad); } }
+
+/* --- 給 Claude 的分析文字 --- */
+function buildPrompt(a) {
+  const S = state.settings; const r = a.res; const wk = weekSummary(state, weekStart(a.date));
+  const recent = state.acts.filter(x => x.date > addDays(a.date, -7) && x.date <= a.date).map(x => ({ date: x.date, type: x.res.type, level: x.res.level, tss: r0(x.res.m.tss), rpe: x.ctx?.rpe ?? null }));
+  const daily = Object.fromEntries(Object.entries(state.daily).filter(([k]) => k > addDays(a.date, -7) && k <= addDays(a.date, 1)));
+  const lite = { date: a.date, name: a.name, type: r.type, headline: r.headline, envLimited: !!r.envLimited,
+    metrics: { dur_min: r0(r.m.dur / 60), np: r0(r.m.np), if: r.m.if && +r.m.if.toFixed(2), tss: r0(r.m.tss), avgHr: r0(r.m.avgHr), maxHr: r.m.maxHr, decouple: r1(r.m.decouple) },
+    sets: (r.sets || []).map(s => ({ n: s.n, underW: r0(s.underW), overW: r0(s.overW), avgW: r0(s.avgW), avgHr: r0(s.avgHr), maxHr: s.maxHr })),
+    checks: r.checks.concat(r.ctx.list).map(c => (c.ok === true ? '✓ ' : c.ok === false ? '✗ ' : '• ') + c.text), context: a.ctx };
+  const up = upcoming(state, dkey(new Date()));
+  return `評估我今天的訓練(由訓練判讀台自動整理)
+FTP ${S.ftp}W。以下是自動判讀結果,請檢查是否合理,補上它沒考慮到的因素(悶熱、補水、睡眠、壓力、前幾天負荷),並調整明天與下週安排。先給結論,最多 6 點,最後最多 2 個追問。
+判讀:${JSON.stringify(lite)}
+本週:TSS ${r0(wk.tss)}(範圍 ${wk.range.join('–')}),SST ${wk.sstPass ? '達標' : wk.sstDone ? '未達標' : '未做'},Over-Under ${wk.ouPass ? '達標' : wk.ouDone ? '未達標' : '未做'},恢復週 ${wk.recovery ? '是' : '否'}
+近 7 天:${JSON.stringify(recent)}
+晨間:${JSON.stringify(daily)}
+接下來課表:${up.rows.map(x => `${x.date.slice(5)} ${x.title}${x.flags.length ? '(' + x.flags.join(';') + ')' : ''}`).join(' / ')}`;
+}
+
+/* --- 呈現 --- */
+function setStatus(msg, kind) { const el = $('#status'); el.textContent = msg; el.dataset.kind = kind || ''; }
+const LV = { pass: ['達標', 'good'], warn: ['部分未達', 'warn'], fail: ['未達標', 'bad'], info: ['僅記錄', 'muted'] };
+const pill = (level, extra) => { const [t, k] = LV[level] || LV.info; return `<span class="pill ${k}">${extra || t}</span>`; };
+const mark = ok => ok === true ? '<i class="mk good" aria-label="通過">✓</i>' : ok === false ? '<i class="mk bad" aria-label="未通過">✗</i>' : '<i class="mk muted" aria-label="提示">•</i>';
+const num = (v, d = 0) => v == null || isNaN(v) ? '–' : (d ? (+v).toFixed(d) : Math.round(v));
+const numOrNull = v => v === '' || v == null ? null : +v;
+const TYPE_CLS = { SST: 'q', OU: 'q', Z2: 'e', OUT: 'e', REC: 'r', REST: 'n' };
+
+function renderSetup() {
+  const el = $('#setup'); const ready = !!conn.ivKey;
+  el.hidden = ready && !!conn.ghToken;
+  el.innerHTML = ready ? `<p class="note">要讓手機和電腦看到同一份紀錄,到下方「連線設定」填 GitHub 權杖。</p>` : `
+    <h2>第一次使用</h2>
+    <ol class="steps">
+      <li>Intervals.icu → Settings → Developer Settings,產生 API 金鑰,並記下運動員 ID(i 開頭)。</li>
+      <li>確認 Intervals.icu 已連 Strava 和 Zwift。</li>
+      <li>GitHub → Settings → Developer settings → Personal access tokens (classic),只勾 gist,產生權杖。</li>
+      <li>填到下方「連線設定」,按「儲存並同步」。另一台裝置填一樣的資料,會自動找到同一份存檔。</li>
+    </ol>`;
+}
+
+function renderTiles() {
+  const S = state.settings; const today = dkey(new Date());
+  const wk = weekSummary(state, weekStart(today)); const fp = ftpProgress(state, today);
+  const up = upcoming(state, today); const t = up.rows[0];
+  const pct = Math.min(100, wk.tss / wk.range[1] * 100);
+  $('#tiles').innerHTML = `
+    <div class="tile"><span class="lbl">FTP</span><b class="big">${S.ftp}<small>W</small></b><span class="sub">上限 ${fp.cap}W</span></div>
+    <div class="tile"><span class="lbl">本週 TSS</span><b class="big">${r0(wk.tss)}</b>
+      <span class="bar"><span style="width:${pct}%" class="${wk.tss > wk.range[1] ? 'over' : ''}"></span><span class="tick" style="left:${wk.range[0] / wk.range[1] * 100}%"></span></span>
+      <span class="sub">目標 ${wk.range.join('–')}</span></div>
+    <div class="tile"><span class="lbl">連續達標</span><b class="big">${fp.streak}<small>/2 週</small></b><span class="sub">SST ${wk.sstPass ? '✓' : wk.sstDone ? '✗' : '–'} · O-U ${wk.ouPass ? '✓' : wk.ouDone ? '✗' : '–'}</span></div>
+    <div class="tile wide"><span class="lbl">明天 ${t ? t.date.slice(5) + ' ' + WD[weekday(t.date)] : ''}</span><b class="mid">${t ? esc(t.title) : '–'}</b>${t && t.flags.length ? `<span class="sub warnt">${esc(t.flags.join(';'))}</span>` : t ? `<span class="sub">${esc(t.detail)}</span>` : ''}</div>`;
+}
+
+function renderPlan() {
+  const today = dkey(new Date()); const up = upcoming(state, today); const nw = up.nextWeek;
+  const nextWk = nw.wk; const busy = isBusy(state, nextWk);
+  const changed = up.rows.some(r => doc.pushed[r.date] && doc.pushed[r.date].sig !== sig(r));
+  const neverPushed = up.rows.every(r => !doc.pushed[r.date]);
+  const row = r => {
+    const p = doc.pushed[r.date]; const st = p && r.iv ? (p.sig === sig(r) ? '<span class="sent">已送出</span>' : '<span class="sent chg">已變更</span>') : '';
+    return `<li class="pr t-${TYPE_CLS[r.type] || 'n'}"><details><summary>
+      <span class="pd">${r.date.slice(5)}<small>${WD[weekday(r.date)]}</small></span>
+      <span class="pt"><b>${esc(r.title)}</b>${r.flags.length ? `<small class="warnt">${esc(r.flags.join(';'))}</small>` : ''}</span>
+      <span class="ptss">${r.tss ? r0(r.tss) : ''}</span>${st}</summary>
+      <div class="pdet"><p>${esc(r.detail)}</p>${r.b ? `<p><b>B 版</b>(疲勞):${esc(r.b)}</p><p><b>C 版</b>(沒時間):${esc(r.c)}</p>` : ''}</div></details></li>`;
+  };
+  const thisRows = up.rows.filter(r => weekStart(r.date) === weekStart(today)), nextRows = up.rows.filter(r => r.date >= nextWk);
+  $('#plan').innerHTML = `
+    <h2>接下來的課表</h2>
+    ${thisRows.length ? `<h3 class="pw">本週剩下</h3><ul class="plist">${thisRows.map(row).join('')}</ul>` : ''}
+    <h3 class="pw">下週 ${nextWk.slice(5)} 起 <span class="pill ${nw.info.recovery ? 'accent' : 'muted'}">${nw.info.recovery ? '恢復週' : `建構第 ${nw.info.buildIdx + 1} 週`}</span><span class="est">預估 TSS ${r0(nw.est)}</span></h3>
+    <ul class="plist">${nextRows.map(row).join('')}</ul>
+    <ul class="pnotes">${nw.notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul>
+    <div class="prow">
+      <label class="chk" for="busy-next"><input id="busy-next" type="checkbox" data-busy="${nextWk}" ${busy ? 'checked' : ''}>下週很忙(維持強度、不進階)</label>
+    </div>
+    <div class="btnrow"><button type="button" class="btn" id="pushBtn">送到 Intervals / Zwift</button>
+      <span class="fine">${changed ? '計畫已依最新結果調整,和行事曆上的版本不同,建議重新送出。' : neverPushed ? '送出後,Zwift 首頁會出現當天課表。Zwift 和 Intervals 的 FTP 要設成一樣。' : '行事曆上的課表是最新的。'}</span></div>`;
+}
+
+function renderMorning() {
+  const today = dkey(new Date()); const d = state.daily[today] || {}; const own = doc.daily[today] || {}; const S = state.settings;
+  const delta = d.rhr != null ? d.rhr - S.rhrBase : null;
+  let note = '';
+  if (delta != null) note += delta > 5 ? `靜止心率比基準高 ${delta},今天的品質課改 B 版。` : `靜止心率 ${d.rhr}(基準 ${S.rhrBase}),正常。`;
+  if (d.sleep != null && d.sleep < 6) note += ' 睡不到 6 小時,今天不做品質課。';
+  const fromIv = cache.wellness[today] && (own.rhr == null && cache.wellness[today].rhr != null);
+  $('#morning').innerHTML = `
+    <h2>今早狀態 <span class="date">${today.slice(5)} ${WD[weekday(today)]}</span></h2>
+    <div class="row3">
+      <label for="m-rhr">靜止心率<input id="m-rhr" type="number" inputmode="numeric" value="${d.rhr ?? ''}" placeholder="${S.rhrBase}"></label>
+      <label for="m-sleep">睡眠(小時)<input id="m-sleep" type="number" inputmode="decimal" step="0.5" value="${d.sleep ?? ''}" placeholder="7"></label>
+      <label class="chk" for="m-stress"><input id="m-stress" type="checkbox" ${d.stress ? 'checked' : ''}>換工作/壓力大</label>
+    </div>
+    ${note || fromIv ? `<p class="note">${esc(note)}${fromIv ? ' <span class="fine">(數值來自 Intervals.icu)</span>' : ''}</p>` : ''}`;
+}
+
+function setsTable(r) {
+  if (!r.sets || !r.sets.length) return ''; const S = state.settings;
+  if (r.type === 'OU') return `<div class="tw"><table><thead><tr><th>組</th><th>Under</th><th>Over</th><th>最高 HR</th></tr></thead><tbody>${r.sets.map(s =>
+    `<tr><td>${s.n}</td><td>${num(s.underW)}W</td><td>${num(s.overW)}W</td><td class="${s.maxHr >= S.ou.hrStop ? 'bad' : s.maxHr > S.ou.hrAdv ? 'warn' : 'good'}">${s.maxHr}${s.n === 3 ? ' ◂' : ''}</td></tr>`).join('')}</tbody></table><p class="fine">◂ 第 3 組是進階判斷組,門檻 ≤${S.ou.hrAdv}</p></div>`;
+  return `<div class="tw"><table><thead><tr><th>組</th><th>時間</th><th>均功</th><th>均 HR</th><th>最高</th></tr></thead><tbody>${r.sets.map(s =>
+    `<tr><td>${s.n}</td><td>${Math.round((s.dur || 0) / 60)}'</td><td>${num(s.avgW, 1)}W</td><td>${num(s.avgHr, 1)}</td><td>${s.maxHr ?? '–'}</td></tr>`).join('')}</tbody></table></div>`;
+}
+
+function actCard(a, isOpen) {
+  const r = a.res, m = r.m, c = a.ctx || {}; const id = esc(a.id); const tm = tomorrowAdvice(state, a);
+  const est = m.estimated ? '<sup>估</sup>' : '';
+  const typeSel = Object.entries(TYPE_LABEL).filter(([k]) => k !== 'REST').map(([k, v]) => `<option value="${k}" ${r.type === k ? 'selected' : ''}>${v}</option>`).join('');
+  return `<article class="card lv-${r.level}" data-id="${id}"><details ${isOpen ? 'open' : ''}>
+    <summary><div class="sumrow"><span class="d">${a.date.slice(5)}<small>${WD[weekday(a.date)]}</small></span>
+      <span class="t"><b>${esc(TYPE_LABEL[r.type])}</b><small>${esc(a.name)}</small></span>${pill(r.level, r.envLimited ? '環境限制' : '')}</div>
+      <p class="head">${esc(r.headline)}</p></summary>
+    <div class="body">
+      ${r.envLimited ? '<p class="callout warn">悶熱環境下的心率結果:這堂不算進階,也不拿去調 FTP,看作環境與補水限制。</p>' : ''}
+      <dl class="metrics">
+        <div><dt>移動時間</dt><dd>${fmtDur(m.dur)}</dd></div><div><dt>NP</dt><dd>${num(m.np)}W${est}</dd></div><div><dt>IF</dt><dd>${num(m.if, 2)}${est}</dd></div>
+        <div><dt>TSS</dt><dd>${num(m.tss)}${est}</dd></div><div><dt>平均 / 最高 HR</dt><dd>${num(m.avgHr)} / ${m.maxHr ?? '–'}</dd></div><div><dt>平均功率</dt><dd>${num(m.avgW)}W</dd></div>
+      </dl>
+      ${setsTable(r)}
+      <ul class="checks">${r.checks.concat(r.ctx.list).map(x => `<li>${mark(x.ok)}<span>${esc(x.text)}</span></li>`).join('')}</ul>
+      ${r.note ? `<p class="fine">${esc(r.note)}</p>` : ''}
+      ${a.date === dkey(new Date()) ? `<section class="next"><h3>${esc(tm.head)}</h3><ul>${tm.items.map(x => `<li>${esc(x)}</li>`).join('')}</ul></section>` : ''}
+      <fieldset class="ctx"><legend>補充這堂課的狀況(會重新判讀,也會調整課表)</legend>
+        <div class="grid">
+          <label for="c-temp-${id}">${r.type === 'OUT' ? '氣溫' : '室溫'} °C<input id="c-temp-${id}" data-k="temp" type="number" inputmode="decimal" value="${c.temp ?? ''}"></label>
+          <label for="c-hum-${id}">濕度 %<input id="c-hum-${id}" data-k="hum" type="number" inputmode="numeric" value="${c.hum ?? ''}"></label>
+          <label for="c-rpe-${id}">RPE 1–10<input id="c-rpe-${id}" data-k="rpe" type="number" inputmode="decimal" step="0.5" value="${c.rpe ?? ''}"></label>
+          <label for="c-fluid-${id}">補水 ml<input id="c-fluid-${id}" data-k="fluid" type="number" inputmode="numeric" value="${c.fluid ?? ''}"></label>
+          <label for="c-carbs-${id}">碳水 g<input id="c-carbs-${id}" data-k="carbs" type="number" inputmode="numeric" value="${c.carbs ?? ''}"></label>
+          <label for="c-ver-${id}">版本<select id="c-ver-${id}" data-k="version">${['A', 'B', 'C'].map(v => `<option ${(c.version || 'A') === v ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+          <label for="c-type-${id}" class="span2">課表類型<select id="c-type-${id}" data-k="__type">${typeSel}</select></label>
+        </div>
+        <div class="tags">${TAGS.map(([k, v]) => `<label class="tag" for="c-tag-${k}-${id}"><input id="c-tag-${k}-${id}" type="checkbox" data-tag="${k}" ${(c.tags || []).includes(k) ? 'checked' : ''}>${v}</label>`).join('')}</div>
+        <label for="c-note-${id}" class="full">備註<textarea id="c-note-${id}" data-k="note" rows="2" placeholder="例如:腿先撐不住、只有一台風扇">${esc(c.note || '')}</textarea></label>
+      </fieldset>
+      <div class="ai"><button type="button" class="btn ghost" data-copy="${id}">複製給 Claude 分析</button>
+        <span class="fine">要更深入的判斷時,複製後貼到 Claude 對話裡。不按就不經過 Claude。</span></div>
+    </div></details></article>`;
+}
+
+function renderActs() {
+  const box = $('#acts');
+  if (!state.acts.length) { box.innerHTML = `<p class="note">${conn.ivKey ? '最近 28 天沒有騎乘活動。' : '設定好 Intervals.icu 後,這裡會出現每堂課的判讀。'}</p>`; return; }
+  const openId = open || state.acts[0].id;
+  box.innerHTML = state.acts.slice(0, 20).map(a => actCard(a, a.id === openId)).join('');
+}
+
+function renderWeek() {
+  const S = state.settings; const today = dkey(new Date()); const fp = ftpProgress(state, today);
+  const weeks = []; let wk = weekStart(today);
+  for (let i = 0; i < 4; i++) { weeks.push(weekSummary(state, wk)); wk = addDays(wk, -7); }
+  const maxT = Math.max(S.week.hi, ...weeks.map(w => w.tss));
+  $('#week').innerHTML = `<h2>週評估與 FTP</h2>
+    <p class="callout ${fp.streak >= 2 && fp.room > 0 ? 'good' : ''}">${esc(fp.advice)}</p>
+    ${fp.streak >= 2 && fp.room > 0 ? `<div class="btnrow"><button type="button" class="btn" data-ftp="${Math.min(3, fp.room)}">FTP +${Math.min(3, fp.room)}W</button><button type="button" class="btn ghost" data-ftp="${Math.min(5, fp.room)}">+${Math.min(5, fp.room)}W</button></div>` : ''}
+    <div class="weeks">${weeks.map((w, i) => {
+      const prev = weeks[i + 1]; const g = prev && prev.tss > 0 && !w.recovery && !prev.recovery ? (w.tss - prev.tss) / prev.tss * 100 : null;
+      return `<div class="wk"><div class="wkh"><b>${w.wk.slice(5)} 起</b>${i === 0 ? '<span class="pill accent">本週</span>' : ''}
+        <label class="chk small" for="rw-${w.wk}"><input id="rw-${w.wk}" type="checkbox" data-rec="${w.wk}" ${w.recovery ? 'checked' : ''}>恢復週</label></div>
+        <div class="wkbar"><span style="width:${w.tss / maxT * 100}%" class="${w.tss > w.range[1] ? 'over' : w.tss < w.range[0] && i > 0 ? 'under' : ''}"></span><i style="left:${w.range[0] / maxT * 100}%"></i><i style="left:${w.range[1] / maxT * 100}%"></i></div>
+        <div class="wkm"><span>TSS <b>${r0(w.tss)}</b>${g != null ? ` <small class="${g > S.week.growth ? 'bad' : ''}">${g > 0 ? '+' : ''}${r0(g)}%</small>` : ''}</span>
+          <span>SST ${w.sstPass ? '<b class="good">✓</b>' : w.sstDone ? '<b class="bad">✗</b>' : '–'}</span><span>O-U ${w.ouPass ? '<b class="good">✓</b>' : w.ouDone ? '<b class="bad">✗</b>' : '–'}</span></div></div>`;
+    }).join('')}</div>
+    <p class="fine">建構週增幅上限 ${S.week.growth}%;恢復週不計入連續週數。FTP 紀錄:${doc.ftpHistory.length ? doc.ftpHistory.map(h => `${h.date.slice(5)} ${h.ftp}W`).join('、') : '尚未調整'}</p>`;
+}
+
+function renderSettings() {
+  const S = doc.settings;
+  const f = (id, label, path, step = 1) => { const v = path.split('.').reduce((o, k) => o[k], S); return `<label for="s-${id}">${label}<input id="s-${id}" data-path="${path}" type="number" step="${step}" inputmode="decimal" value="${v}"></label>`; };
+  const ladSel = (key, lad, cur) => `<select id="s-lad-${key}" data-lad="${key}">${lad.map((x, i) => `<option value="${i}" ${i === cur ? 'selected' : ''}>${x.join('×')}'</option>`).join('')}</select>`;
+  $('#settingsBody').innerHTML = `
+    <h3>連線設定</h3>
+    <div class="grid conn">
+      <label for="k-iv" class="span2">Intervals.icu API 金鑰<input id="k-iv" type="password" autocomplete="off" value="${esc(conn.ivKey || '')}"></label>
+      <label for="k-aid">運動員 ID<input id="k-aid" type="text" autocomplete="off" placeholder="i123456" value="${esc(conn.athlete || '')}"></label>
+      <label for="k-gh" class="span2">GitHub 權杖(gist 權限)<input id="k-gh" type="password" autocomplete="off" value="${esc(conn.ghToken || '')}"></label>
+      <label for="k-gist">存檔 ID(自動)<input id="k-gist" type="text" autocomplete="off" value="${esc(conn.gistId || '')}"></label>
+      <label for="k-base" class="full">API 位址(被瀏覽器擋住時改填 Cloudflare 中繼網址)<input id="k-base" type="url" autocomplete="off" placeholder="https://intervals.icu" value="${esc(conn.base || '')}"></label>
+    </div>
+    <div class="btnrow"><button type="button" class="btn" id="connSave">儲存並同步</button></div>
+    <p class="fine">金鑰和權杖只存在這台裝置的瀏覽器裡。<span id="cloud"></span></p>
+    <h3>規則門檻</h3>
+    <div class="grid">
+      ${f('ftp', 'FTP (W)', 'ftp')}${f('rhr', '靜止心率基準', 'rhrBase')}
+      ${f('sstlo', 'SST 下限 W', 'sst.lo')}${f('ssthi', 'SST 上限 W', 'sst.hi')}${f('sstd', 'SST 兩組 HR 差', 'sst.driftMax')}
+      ${f('oul', 'Under 下限 W', 'ou.underLo')}${f('ouh', 'Under 上限 W', 'ou.underHi')}${f('ool', 'Over 下限 W', 'ou.overLo')}${f('ooh', 'Over 上限 W', 'ou.overHi')}
+      ${f('oadv', 'O-U 進階 HR', 'ou.hrAdv')}${f('ostop', 'O-U 停止 HR', 'ou.hrStop')}${f('osets', 'O-U 組數', 'ou.sets')}
+      ${f('z2hi', 'Z2 上限 W', 'z2.hi')}${f('z2hr', 'Z2 HR 上限', 'z2.hrMax')}${f('z2m', '週中 Z2 分鐘', 'z2Min', 15)}
+      ${f('recw', '恢復騎上限 W', 'rec.wMax')}${f('recm', '恢復騎分鐘', 'recMin', 5)}${f('heat', '悶熱體感 °C', 'heat')}
+      ${f('lb', '長騎起始小時', 'longH.base', 0.25)}${f('lm', '長騎上限小時', 'longH.max', 0.25)}${f('lr', '恢復週長騎小時', 'longH.rec', 0.25)}
+    </div>
+    <h3>進階起點</h3>
+    <div class="grid">
+      <label for="s-pstart">起算週(週一)<input id="s-pstart" type="date" data-pstart="1" value="${S.prog.start}"></label>
+      <label for="s-lad-sst">SST 起點${ladSel('sst', LADDER.SST, S.prog.sst)}</label>
+      <label for="s-lad-ou">O-U 起點${ladSel('ou', LADDER.OU, S.prog.ou)}</label>
+      <label for="s-anchor" class="span2">恢復週錨點(某個恢復週的週一)<input id="s-anchor" type="date" data-anchor="1" value="${S.anchor}"></label>
+    </div>
+    <p class="fine">之後每週依結果自動進階:達標升一階、悶熱未達標維持、連續兩週未達標退一階、忙碌週維持。</p>
+    <h3>每週課表範本</h3>
+    <div class="grid plan">${S.plan.map((p, i) => `<label for="p-${i}">${WD[i]}<select id="p-${i}" data-plan="${i}">${Object.entries(TYPE_LABEL).filter(([k]) => k !== 'OTHER').map(([k, v]) => `<option value="${k}" ${p === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>`).join('')}</div>
+    <h3>備份</h3>
+    <div class="btnrow"><button type="button" class="btn ghost" id="expBtn">下載備份檔</button>
+      <label class="btn ghost" for="impFile">匯入備份<input id="impFile" type="file" accept=".json,application/json" hidden></label></div>
+    <p class="fine" id="dataMsg" role="status"></p>`;
+}
+
+function render() {
+  renderSetup(); renderTiles(); renderPlan(); renderMorning(); renderActs(); renderWeek(); renderSettings();
+  $('#lastSync').textContent = cache.lastSync ? '上次讀取 ' + new Date(cache.lastSync).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '尚未讀取活動';
+}
+function refreshAfterEdit(card, a) {
+  buildState(); renderTiles(); renderPlan(); renderWeek();
+  if (card) { const na = state.acts.find(x => x.id === a); const nc = document.createElement('div'); nc.innerHTML = actCard(na, true); card.replaceWith(nc.firstElementChild); }
+}
+
+/* --- 事件 --- */
+document.addEventListener('change', (e) => {
+  const t = e.target; const card = t.closest('.card');
+  if (card && (t.dataset.k || t.dataset.tag)) {
+    const id = card.dataset.id; const c = { ...(doc.ctx[id] || {}) };
+    if (t.dataset.tag) { const s = new Set(c.tags || []); t.checked ? s.add(t.dataset.tag) : s.delete(t.dataset.tag); c.tags = [...s]; }
+    else if (['version', 'note', '__type'].includes(t.dataset.k)) c[t.dataset.k] = t.value;
+    else c[t.dataset.k] = numOrNull(t.value);
+    c._t = now(); doc.ctx[id] = c; open = id; touch(); refreshAfterEdit(card, id); return;
+  }
+  if (t.closest('#morning')) {
+    const today = dkey(new Date());
+    doc.daily[today] = { rhr: numOrNull($('#m-rhr').value), sleep: numOrNull($('#m-sleep').value), stress: $('#m-stress').checked, _t: now() };
+    touch(); buildState(); renderTiles(); renderPlan(); renderMorning(); return;
+  }
+  const S = doc.settings; const setT = () => { doc.settingsT = now(); touch(); buildState(); render(); };
+  if (t.dataset.path) { const ks = t.dataset.path.split('.'); let o = S; while (ks.length > 1) o = o[ks.shift()]; o[ks[0]] = +t.value; return setT(); }
+  if (t.dataset.plan != null) { S.plan[+t.dataset.plan] = t.value; return setT(); }
+  if (t.dataset.lad) { S.prog[t.dataset.lad] = +t.value; return setT(); }
+  if (t.dataset.pstart && t.value) { S.prog.start = weekStart(t.value); return setT(); }
+  if (t.dataset.anchor && t.value) { S.anchor = weekStart(t.value); return setT(); }
+  if (t.dataset.rec) { doc.weeks[t.dataset.rec] = { ...(doc.weeks[t.dataset.rec] || {}), recovery: t.checked, _t: now() }; touch(); buildState(); renderTiles(); renderPlan(); renderWeek(); return; }
+  if (t.dataset.busy) { doc.weeks[t.dataset.busy] = { ...(doc.weeks[t.dataset.busy] || {}), busy: t.checked, _t: now() }; touch(); buildState(); renderPlan(); return; }
+  if (t.id === 'impFile' && t.files[0]) t.files[0].text().then(importData).catch(() => { $('#dataMsg').textContent = '讀不到這個檔案。'; });
+});
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.id === 'syncBtn') { await syncIntervals(); cloudPull(); }
+  else if (b.id === 'pushBtn') pushPlan(b);
+  else if (b.id === 'connSave') {
+    conn = { ivKey: $('#k-iv').value.trim(), athlete: $('#k-aid').value.trim(), ghToken: $('#k-gh').value.trim(), gistId: $('#k-gist').value.trim(), base: $('#k-base').value.trim() };
+    saveConn(); renderSetup(); await cloudPull(); await syncIntervals();
+  }
+  else if (b.dataset.copy) {
+    const a = state.acts.find(x => x.id === b.dataset.copy); const txt = buildPrompt(a);
+    try { await navigator.clipboard.writeText(txt); b.textContent = '已複製,貼到 Claude'; setTimeout(() => { b.textContent = '複製給 Claude 分析'; }, 2500); }
+    catch (err) { const ta = document.createElement('textarea'); ta.value = txt; ta.rows = 6; ta.className = 'copybox'; b.after(ta); ta.select(); }
+  }
+  else if (b.dataset.ftp) {
+    const add = +b.dataset.ftp; const S = doc.settings; const old = S.ftp; const k = (old + add) / old;
+    S.ftp = old + add;
+    for (const [o, key] of [[S.sst, 'lo'], [S.sst, 'hi'], [S.ou, 'underLo'], [S.ou, 'underHi'], [S.ou, 'overLo'], [S.ou, 'overHi'], [S.ou, 'overReduced']]) o[key] = Math.round(o[key] * k);
+    doc.ftpHistory.push({ date: dkey(new Date()), ftp: S.ftp, add }); doc.settingsT = now(); touch(); buildState(); render();
+    setStatus(`FTP 調到 ${S.ftp}W,SST 和 Over-Under 瓦數已等比例更新。記得改 Zwift 和 Intervals 的 FTP,並重新送出課表。`, 'ok');
+  }
+  else if (b.id === 'expBtn') {
+    const blob = new Blob([JSON.stringify(doc, null, 1)], { type: 'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `訓練判讀備份-${dkey(new Date())}.json`; document.body.appendChild(a); a.click(); a.remove();
+    $('#dataMsg').textContent = '已下載備份檔。';
+  }
+});
+document.addEventListener('toggle', (e) => { const c = e.target.closest && e.target.closest('.card'); if (c && e.target.open) open = c.dataset.id; }, true);
+function importData(txt) {
+  try { const d = JSON.parse(txt); if (d.app !== 'terence-coach') throw 0; doc = mergeDocs(doc, d); doc.settings = deepMerge(DEF_SETTINGS, doc.settings); touch(); buildState(); render(); $('#dataMsg').textContent = '已匯入並合併備份。'; }
+  catch (e) { $('#dataMsg').textContent = '這不是本工具的備份檔。'; }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') { if (dirty) cloudPush(); return; }
+  if (conn.ivKey && (!cache.lastSync || Date.now() - new Date(cache.lastSync) > 20 * 60e3)) { syncIntervals(); cloudPull(); }
+});
+
+/* --- 啟動 --- */
+(async () => {
+  loadConn(); await loadLocal(); buildState(); render();
+  if (!conn.ivKey) { $('#settingsBox').open = true; setStatus('先完成下方的連線設定。', 'warn'); return; }
+  await cloudPull(); await syncIntervals();
+})();
+
+</script>
+</body>
+</html>
