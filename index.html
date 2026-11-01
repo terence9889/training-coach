@@ -810,6 +810,7 @@ async function syncIntervals() {
   try {
     const today = dkey(new Date());
     const list = await iv(`/api/v1/athlete/${aid()}/activities?oldest=${addDays(today, -28)}&newest=${today}`);
+    const blocked = (list || []).filter(a => (a.source === 'STRAVA' || a._note) && !a.moving_time).length;
     const rides = (list || []).filter(a => RIDE_TYPES.has(a.type) && (a.moving_time || 0) >= 600);
     const known = new Map(cache.acts.map(a => [a.id, a]));
     const todo = rides.filter(a => !known.get(String(a.id)) || !known.get(String(a.id)).detailed);
@@ -842,11 +843,12 @@ async function syncIntervals() {
       for (const w of wl || []) cache.wellness[w.id] = { rhr: w.restingHR ?? null, sleep: w.sleepSecs ? Math.round(w.sleepSecs / 360) / 10 : null };
     } catch (e) { }
     const cutoff = addDays(today, -60);
-    cache.acts = cache.acts.filter(a => a.date >= cutoff);
+    cache.acts = cache.acts.filter(a => a.date >= cutoff && !(a.manual && cache.acts.some(x => !x.manual && x.date === a.date && x.type === a.type)));
     cache.lastSync = new Date().toISOString(); await DB.set('cache', cache);
     buildState(); if (todo.length) open = state.acts[0] && state.acts[0].id;
     render();
-    setStatus(todo.length ? `已讀入 ${todo.length} 筆新活動並完成判讀。` : '已是最新,沒有新活動。', 'ok');
+    const msg = todo.length ? `已讀入 ${todo.length} 筆新活動並完成判讀。` : '已是最新,沒有新活動。';
+    setStatus(blocked ? `${msg} 另有 ${blocked} 筆從 Strava 轉來的活動讀不到(Strava 規定不能再轉給其他程式),請讓 Zwift 和碼錶直接連 Intervals.icu。` : msg, blocked ? 'warn' : 'ok');
   } catch (e) { setStatus(ivErr(e), 'bad'); }
   finally { syncing = false; }
 }
@@ -1193,7 +1195,15 @@ document.addEventListener('click', async (e) => {
 });
 document.addEventListener('toggle', (e) => { const c = e.target.closest && e.target.closest('.card'); if (c && e.target.open) open = c.dataset.id; }, true);
 function importData(txt) {
-  try { const d = JSON.parse(txt); if (d.app !== 'terence-coach') throw 0; doc = mergeDocs(doc, d); doc.settings = deepMerge(DEF_SETTINGS, doc.settings); touch(); buildState(); render(); $('#dataMsg').textContent = '已匯入並合併備份。'; }
+  try {
+    const d = JSON.parse(txt); if (d.app !== 'terence-coach') throw 0;
+    let added = 0;
+    if (Array.isArray(d.acts)) {
+      const ids = new Set(cache.acts.map(a => a.id));
+      for (const a of d.acts) if (!ids.has(a.id) && !cache.acts.some(x => !x.manual && x.date === a.date && x.type === a.type)) { cache.acts.push({ ...a, manual: true, detailed: true }); added++; }
+      DB.set('cache', cache);
+    }
+    doc = mergeDocs(doc, d); doc.settings = deepMerge(DEF_SETTINGS, doc.settings); touch(); buildState(); render(); $('#dataMsg').textContent = added ? `已匯入 ${added} 筆活動與紀錄。` : '已匯入並合併備份。'; }
   catch (e) { $('#dataMsg').textContent = '這不是本工具的備份檔。'; }
 }
 document.addEventListener('visibilitychange', () => {
