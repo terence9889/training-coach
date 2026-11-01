@@ -738,7 +738,7 @@ const DB = (() => {
 
 /* --- 狀態 --- */
 // doc:會同步到雲端的部分;cache:Intervals 抓來的活動(只存本機)
-const blankDoc = () => ({ app: 'terence-coach', v: 2, settings: structuredClone(DEF_SETTINGS), settingsT: 0, ctx: {}, daily: {}, weeks: { '2026-10-19': { recovery: true, _t: 1 }, '2026-11-02': { busy: true, _t: 1 } }, ftpHistory: [], pushed: {} });
+const blankDoc = () => ({ app: 'terence-coach', v: 2, settings: structuredClone(DEF_SETTINGS), settingsT: 0, ctx: {}, daily: {}, weeks: { '2026-10-19': { recovery: true, _t: 1 }, '2026-11-02': { busy: true, _t: 1 } }, ftpHistory: [], pushed: {}, manual: {} });
 let doc = blankDoc(), cache = { acts: [], wellness: {}, lastSync: null }, conn = {};
 let state = null; // 給引擎用的檢視
 let open = null;
@@ -751,7 +751,13 @@ function buildState() {
   for (const [k, w] of Object.entries(cache.wellness)) daily[k] = { ...w };
   for (const [k, d] of Object.entries(doc.daily)) daily[k] = { ...(daily[k] || {}), ...Object.fromEntries(Object.entries(d).filter(([kk, v]) => v != null && kk !== '_t')) };
   const weeks = Object.fromEntries(Object.entries(doc.weeks).map(([k, v]) => [k, v]));
-  const acts = cache.acts.map(a => {
+  const base = cache.acts.filter(a => !a.manual);
+  for (const m of Object.values(doc.manual || {})) {
+    if (!m || !m.act) continue;
+    if (base.some(x => x.id === m.act.id || (x.date === m.act.date && x.type === m.act.type))) continue;
+    base.push({ ...m.act, manual: true, detailed: true });
+  }
+  const acts = base.map(a => {
     const c = doc.ctx[a.id] || {};
     const ctx = { ...c }; if (ctx.rpe == null && a.icu_rpe) ctx.rpe = a.icu_rpe;
     return { ...a, ctx, typeOverride: c.__type || null };
@@ -765,6 +771,10 @@ async function loadLocal() {
   const d = await DB.get('doc'); if (d) doc = mergeDocs(blankDoc(), d);
   doc.settings = deepMerge(DEF_SETTINGS, doc.settings);
   const c = await DB.get('cache'); if (c) cache = c;
+  doc.manual = doc.manual || {}; let mig = false;
+  for (const a of cache.acts.filter(x => x.manual)) if (!doc.manual[a.id]) { const { manual, detailed, res, ...act } = a; doc.manual[a.id] = { act, _t: now() }; mig = true; }
+  cache.acts = cache.acts.filter(x => !x.manual);
+  if (mig) { DB.set('cache', cache); dirty = true; }
 }
 let saveT = null, dirty = false;
 function touch() { dirty = true; DB.set('doc', doc); clearTimeout(saveT); saveT = setTimeout(cloudPush, 2500); }
@@ -780,7 +790,7 @@ function mergeMap(a = {}, b = {}) { const out = { ...a }; for (const [k, v] of O
 function mergeDocs(a, b) {
   const out = { ...a };
   if ((b.settingsT || 0) > (a.settingsT || 0)) { out.settings = b.settings; out.settingsT = b.settingsT; }
-  for (const k of ['ctx', 'daily', 'weeks', 'pushed']) out[k] = mergeMap(a[k], b[k]);
+  for (const k of ['ctx', 'daily', 'weeks', 'pushed', 'manual']) out[k] = mergeMap(a[k], b[k]);
   const seen = new Set(); out.ftpHistory = [...(a.ftpHistory || []), ...(b.ftpHistory || [])].filter(h => { const key = h.date + h.ftp; if (seen.has(key)) return false; seen.add(key); return true; }).sort((x, y) => x.date.localeCompare(y.date));
   return out;
 }
@@ -1199,9 +1209,8 @@ function importData(txt) {
     const d = JSON.parse(txt); if (d.app !== 'terence-coach') throw 0;
     let added = 0;
     if (Array.isArray(d.acts)) {
-      const ids = new Set(cache.acts.map(a => a.id));
-      for (const a of d.acts) if (!ids.has(a.id) && !cache.acts.some(x => !x.manual && x.date === a.date && x.type === a.type)) { cache.acts.push({ ...a, manual: true, detailed: true }); added++; }
-      DB.set('cache', cache);
+            doc.manual = doc.manual || {};
+      for (const a of d.acts) { if (!doc.manual[a.id]) added++; doc.manual[a.id] = { act: a, _t: now() }; }
     }
     doc = mergeDocs(doc, d); doc.settings = deepMerge(DEF_SETTINGS, doc.settings); touch(); buildState(); render(); $('#dataMsg').textContent = added ? `已匯入 ${added} 筆活動與紀錄。` : '已匯入並合併備份。'; }
   catch (e) { $('#dataMsg').textContent = '這不是本工具的備份檔。'; }
